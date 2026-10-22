@@ -38,7 +38,36 @@
   .alert.err { background: var(--err-bg); color: var(--err-ink); }
   .alert.ok { background: #e6f4ea; color: #1d5e2c; }
   .hint { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
-  #extras[hidden] { display: none; }
+  #extras[hidden], .menu[hidden], .acoes[hidden] { display: none; }
+  .ui input[type=text] { width: 100%; max-width: 320px; border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; font: 14px Inter, system-ui, sans-serif; background: #fff; color: var(--ink); }
+  .ui textarea.msg { min-height: 150px; }
+  .sec { scroll-margin-top: 64px; }
+  .sec + .sec, #extras > .sec:first-child { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 4px; }
+  .sec > h2 { font-size: 16px; font-weight: 800; margin-top: 16px; }
+
+  /* Menu fixo no topo: atalhos para as seções (desliza para o lado no celular) */
+  .menu { position: sticky; top: 0; z-index: 20; background: rgba(233,235,239,.96); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); }
+  .menu nav { max-width: 720px; margin: 0 auto; padding: 8px 16px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .menu nav::-webkit-scrollbar { display: none; }
+  .menu a { flex: none; font: 600 13px Inter, system-ui, sans-serif; color: var(--ink-2); text-decoration: none; padding: 8px 12px; border-radius: 999px; background: #fff; border: 1px solid var(--line); white-space: nowrap; }
+  .menu a:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* Barra fixa embaixo com as ações principais */
+  .acoes { position: sticky; bottom: 0; z-index: 20; background: rgba(233,235,239,.96); backdrop-filter: blur(6px); border-top: 1px solid var(--line); }
+  .acoes div { max-width: 720px; margin: 0 auto; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); display: flex; gap: 8px; }
+  .acoes button { flex: 1; min-width: 0; padding: 11px 8px; }
+
+  @media (max-width: 640px) {
+    .ui { padding-top: 14px; }
+    .ui h1 { font-size: 20px; }
+    /* 16px evita o zoom automático do iPhone ao tocar no campo */
+    .ui textarea, .ui textarea.prose, .ui input[type=text], .ui input[type=number] { font-size: 16px; }
+    .ui input[type=text] { max-width: none; }
+    .ui textarea.msg { min-height: 300px; }
+    .row button { flex: 1 1 100%; min-height: 46px; }
+    .acoes button { font-size: 13px; min-height: 46px; }
+    .logo-box input[type=file] { max-width: 100%; }
+  }
   .preview-title { max-width: 720px; margin: 18px auto 0; padding: 0 16px; font-size: 13px; font-weight: 700; color: var(--ink-2); }
   #preview { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 12px 16px 40px; }
 
@@ -107,7 +136,7 @@
 
   @media print {
     html, body { background: #fff; }
-    .ui, .preview-title { display: none !important; }
+    .ui, .preview-title, .menu, .acoes { display: none !important; }
     #preview { display: block; padding: 0; }
     .page { box-shadow: none; zoom: 1 !important; page-break-after: always; break-after: page; }
     .page:last-child { page-break-after: auto; break-after: auto; }
@@ -116,7 +145,19 @@
 </head>
 <body>
 
+<div class="menu" id="menu" hidden>
+  <nav aria-label="Seções">
+    <a href="#sec-dados">Dados</a>
+    <a href="#sec-msg">Mensagem</a>
+    <a href="#sec-fizemos">O que fizemos</a>
+    <a href="#sec-ajustes">Ajustes</a>
+    <a href="#sec-passos">Passos</a>
+    <a href="#previewTitle">Prévia</a>
+  </nav>
+</div>
+
 <div class="ui">
+  <div class="sec" id="sec-dados">
   <h1>Gerador de Relatórios</h1>
   <p class="sub">Cole a tabela de placeholders que o seu app gera (ou um JSON) e toque em <b>Gerar</b>. O relatório se ajusta aos canais que vierem: só GBP, só Ads ou os dois. Os dados ficam só no seu navegador e não são enviados a lugar nenhum.</p>
 
@@ -127,16 +168,24 @@
     <button id="btnExemplo">Carregar exemplo (cliente fictício)</button>
   </div>
   <div class="alerts" id="alertas"></div>
+  </div>
 
   <div id="extras" hidden>
-    <h3>Logo do cliente <small style="font-weight:400;color:var(--muted)">(opcional)</small></h3>
-    <div class="logo-box">
-      <input type="file" id="logoArq" accept="image/png,image/svg+xml,image/webp,image/jpeg">
-      <img id="logoPrev" alt="" hidden>
-      <button id="btnTirarLogo" type="button" hidden>Remover logo</button>
+    <div class="sec" id="sec-msg">
+    <h2>Mensagem para o WhatsApp</h2>
+    <p class="hint">Resumo em 3 linhas para mandar junto com o PDF. Sem estimativa em R$ de propósito: fora do PDF, ela pode ser lida como promessa.</p>
+    <label for="contato">Nome de quem recebe <small>(opcional; fica guardado para este cliente)</small></label>
+    <input type="text" id="contato" autocomplete="off" placeholder="Ex.: Jorge">
+    <label for="msg">Texto <small>(pode editar antes de copiar)</small></label>
+    <textarea id="msg" class="prose msg"></textarea>
+    <div class="row">
+      <button class="primary" id="btnCopiar">Copiar mensagem</button>
+      <button id="btnRefazer">Refazer texto</button>
     </div>
-    <p class="hint">Aparece pequena no topo da capa. Prefira PNG com fundo transparente. A logo fica guardada só neste navegador e volta sozinha da próxima vez que você gerar o relatório deste cliente.</p>
-    <h3>O que fizemos no mês</h3>
+    </div>
+
+    <div class="sec" id="sec-fizemos">
+    <h2>O que fizemos no mês</h2>
     <p class="hint">Copie o histórico de atividades do seu sistema e cole no canal certo, uma ação por linha. Canal vazio não aparece no relatório.</p>
     <label for="fzGbp">Perfil no Google (GBP)</label>
     <textarea id="fzGbp" class="prose" placeholder="Cadastramos o serviço &quot;auto socorro&quot; no seu Perfil.&#10;Publicamos 4 fotos reais da equipe."></textarea>
@@ -144,24 +193,44 @@
     <textarea id="fzAds" class="prose" placeholder="Tiramos dos anúncios as buscas que gastavam sem trazer contato."></textarea>
     <label for="fzSite">Site</label>
     <textarea id="fzSite" class="prose" placeholder="Criamos a página do serviço de reboque de moto."></textarea>
+    </div>
+
+    <div class="sec" id="sec-ajustes">
+    <h2>Ajustes</h2>
+    <h3>Logo do cliente <small style="font-weight:400;color:var(--muted)">(opcional)</small></h3>
+    <div class="logo-box">
+      <input type="file" id="logoArq" accept="image/png,image/svg+xml,image/webp,image/jpeg">
+      <img id="logoPrev" alt="" hidden>
+      <button id="btnTirarLogo" type="button" hidden>Remover logo</button>
+    </div>
+    <p class="hint">Aparece pequena no topo da capa. Prefira PNG com fundo transparente. A logo fica guardada só neste navegador e volta sozinha da próxima vez que você gerar o relatório deste cliente.</p>
     <h3>Pedidos de rota</h3>
     <label style="font-weight:400;display:flex;gap:8px;align-items:flex-start;margin-top:8px"><input type="checkbox" id="rotas" style="margin-top:3px"> <span>Contar pedidos de rota do Perfil como resultado <small style="color:var(--muted)">(marque só para clientes em que a visita à loja importa; desmarcado, as rotas aparecem só na tabela final)</small></span></label>
     <label for="avaliacoes">Avaliações no Perfil do Google <small>(total hoje; deixe vazio se não souber)</small></label>
     <input type="number" id="avaliacoes" min="0" step="1">
     <p class="hint">Com menos de 10 avaliações, o relatório ganha uma página sobre isso e um passo para o cliente pedir avaliações.</p>
-    <label for="passos">Próximos passos <small>(até 3; formato: Você/Nós: ação | Como saber: ...)</small></label>
+    </div>
+
+    <div class="sec" id="sec-passos">
+    <h2>Próximos passos</h2>
+    <label for="passos">Até 3 passos, um por linha <small>(formato: Você/Nós: ação | Como saber: ...)</small></label>
     <textarea id="passos" class="prose"></textarea>
     <p class="hint">Os próximos passos vêm pré-preenchidos com sugestões calculadas a partir dos números. Revise antes de enviar.</p>
-    <div class="row">
-      <button id="btnAtualizar">Atualizar relatório</button>
-      <button class="primary" id="btnPdf">Baixar PDF</button>
+    <p class="hint">Para baixar: toque em <b>Baixar PDF</b> na barra de baixo. No computador (Chrome ou Edge), em "Destino", escolha <b>Salvar como PDF</b>. No celular, use Compartilhar → Imprimir → Salvar como PDF.</p>
     </div>
-    <p class="hint">No computador (Chrome ou Edge): em "Destino", escolha <b>Salvar como PDF</b>. No celular, use Compartilhar → Imprimir → Salvar como PDF.</p>
   </div>
 </div>
 
-<div class="preview-title" id="previewTitle" hidden>Pré-visualização</div>
+<div class="preview-title sec" id="previewTitle" hidden>Pré-visualização</div>
 <div id="preview"></div>
+
+<div class="acoes" id="acoes" hidden>
+  <div>
+    <button id="btnAtualizar">Atualizar</button>
+    <button id="btnCopiar2">Copiar mensagem</button>
+    <button class="primary" id="btnPdf">Baixar PDF</button>
+  </div>
+</div>
 
 <script>
 /* ============================================================
@@ -443,26 +512,65 @@ function destaqueAlta(D) {
   return best ? { ...TXT[best[0]], c: best[1], p: best[2] } : null;
 }
 
+// A frase principal do mês: vai na capa e na mensagem do WhatsApp.
+function manchete(D) {
+  const ch = D.ads ? D.ads : D.gbp;
+  const mes = D.mes.nome, ant = D.mesAnt;
+  const c = ch.acoes, p = ch.prev.acoes;
+  if (!ok(p) || !p || !ant) return { c, p, h: `Em ${mes}, ${int(c)} pessoas entraram em contato com você.`, ri: null, margem: 0, alta: null };
+  const ri = ok(D.invest.prev) && D.invest.prev ? D.invest.cur / D.invest.prev : null;
+  const antL = ant.toLowerCase();
+  // Com números pequenos, alguns contatos a mais ou a menos é variação normal, não subida nem queda.
+  const margem = Math.max(Math.sqrt(p), p * 0.1);
+  const perto = Math.abs(c - p) <= margem;
+  const alta = destaqueAlta(D);
+  let h;
+  if (perto) h = alta ? `${mes} ficou perto de ${antL}, e ${alta.frase}.` : `${mes} ficou parecido com ${antL}.`;
+  else if (c > p && ri !== null && Math.abs(ri - 1) <= 0.1) h = `Com o mesmo dinheiro de ${antL}, mais gente entrou em contato.`;
+  else if (c > p) h = `${mes} trouxe mais contatos que ${antL}.`;
+  else h = alta ? `${mes} trouxe menos contatos que ${antL}, mas ${alta.frase}.` : `${mes} trouxe menos contatos que ${antL}.`;
+  return { c, p, h, ri, margem, alta };
+}
+
+const proxMes = D => MESES[(MESES.indexOf(D.mes.nome.toLowerCase()) + 1) % 12] || 'o próximo mês';
+
+// Resumo de 3 linhas para o WhatsApp: manchete + número com comparação, um passo, aviso do PDF.
+function resumoWhats(D, contato, passosTxt) {
+  const m = manchete(D);
+  const fonte = D.ads ? 'pelos anúncios no Google' : 'pelo seu Perfil no Google';
+  const nome = String(contato || '').trim();
+  let l1 = `Oi${nome ? ', ' + nome : ''}! ${m.h}`;
+  if (ok(m.p) && m.p && D.mesAnt) {
+    l1 += ` Foram ${int(m.c)} contatos ${fonte} (${int(m.p)} em ${D.mesAnt.toLowerCase()})`;
+    if (m.alta && m.c <= m.p + m.margem) l1 += `, e ${m.alta.sujeito.charAt(0).toLowerCase() + m.alta.sujeito.slice(1)} ${m.alta.verbo} de ${int(m.alta.p)} para ${int(m.alta.c)}`;
+    l1 += '.';
+  }
+  if (D.ads && D.gbp) l1 += ` Pelo seu Perfil no Google, foram ${int(D.gbp.acoes)} contatos.`;
+  const linhas = [l1];
+  const passos = String(passosTxt || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  const escolhido = passos.find(x => /avalia/i.test(x)) || passos.find(x => /^voc[eê]\s*:/i.test(x)) || passos[0];
+  if (escolhido) {
+    let acao = escolhido.split('|')[0].trim();
+    const nos = /^(n[oó]s|ag[eê]ncia)\s*:/i.test(acao);
+    acao = acao.replace(/^(voc[eê]|n[oó]s|cliente|ag[eê]ncia)\s*:\s*/i, '');
+    acao = acao.charAt(0).toLowerCase() + acao.slice(1);
+    if (!/[.!?]$/.test(acao)) acao += '.';
+    linhas.push(nos ? `Para ${proxMes(D)}, a gente vai ${acao}` : `O passo mais importante para ${proxMes(D)}: ${acao}`);
+  }
+  linhas.push('O relatório completo está no PDF abaixo.');
+  return linhas.join('\n\n');
+}
+
 function pgCapa(D) {
   const ch = D.ads ? D.ads : D.gbp;
   const fonte = D.ads ? 'pelos anúncios no Google' : 'pelo seu Perfil no Google';
   const mes = D.mes.nome, ant = D.mesAnt;
-  const c = ch.acoes, p = ch.prev.acoes;
-  let h, sub = '';
+  const { c, p, h, ri, margem, alta } = manchete(D);
+  let sub = '';
   if (!ok(p) || !p || !ant) {
-    h = `Em ${mes}, ${int(c)} pessoas entraram em contato com você.`;
     sub = `<p>Elas chegaram ${fonte}.</p>`;
   } else {
-    const ri = ok(D.invest.prev) && D.invest.prev ? D.invest.cur / D.invest.prev : null;
     const antL = ant.toLowerCase();
-    // Com números pequenos, alguns contatos a mais ou a menos é variação normal, não subida nem queda.
-    const margem = Math.max(Math.sqrt(p), p * 0.1);
-    const perto = Math.abs(c - p) <= margem;
-    const alta = destaqueAlta(D);
-    if (perto) h = alta ? `${mes} ficou perto de ${antL}, e ${alta.frase}.` : `${mes} ficou parecido com ${antL}.`;
-    else if (c > p && ri !== null && Math.abs(ri - 1) <= 0.1) h = `Com o mesmo dinheiro de ${antL}, mais gente entrou em contato.`;
-    else if (c > p) h = `${mes} trouxe mais contatos que ${antL}.`;
-    else h = alta ? `${mes} trouxe menos contatos que ${antL}, mas ${alta.frase}.` : `${mes} trouxe menos contatos que ${antL}.`;
     sub = `<p>Vieram <b>${int(c)} contatos</b> ${fonte} em ${mes.toLowerCase()}. Em ${antL}, foram <b>${int(p)}</b>.</p>`;
     if (alta && c <= p + margem) sub += `<p>${alta.sujeito} ${alta.verbo} de <b>${int(alta.p)}</b> para <b>${int(alta.c)}</b>.</p>`;
     if (ri !== null) {
@@ -624,7 +732,7 @@ function pgPassos(D, n, texto) {
     const [frase, ...resto] = acao.split(/(?<=\.)\s+/);
     return `<li>${quem ? `<span class="who">${quem}</span>` : ''}<span class="what">${esc(frase)}</span>${resto.length ? ' ' + esc(resto.join(' ')) : ''}${como ? `<span class="how">Como saber: ${esc(como)}</span>` : ''}</li>`;
   }).join('');
-  const prox = MESES[(MESES.indexOf(D.mes.nome.toLowerCase()) + 1) % 12] || 'o próximo mês';
+  const prox = proxMes(D);
   return pagina(D, n, `<div class="tag">O que vamos fazer em ${prox}</div><h2>${linhas.length === 1 ? 'Um passo' : linhas.length === 2 ? 'Dois passos' : 'Três passos'} pequenos</h2><ol class="acts">${li}</ol>`);
 }
 
@@ -718,6 +826,28 @@ function ajustarZoom() {
   document.querySelectorAll('.page').forEach(p => p.style.zoom = z);
 }
 
+// Mensagem: refeita sozinha enquanto você não editar o texto à mão.
+let msgEditada = false;
+const chaveContato = c => 'contato:' + String(c || '').trim().toLowerCase();
+function lerContato(c) { try { return localStorage.getItem(chaveContato(c)) || ''; } catch (e) { return ''; } }
+function guardarContato(c, v) { try { v ? localStorage.setItem(chaveContato(c), v) : localStorage.removeItem(chaveContato(c)); } catch (e) {} }
+function refazerMsg(forcar) {
+  if (!modelo || (msgEditada && !forcar)) return;
+  $('msg').value = resumoWhats(modelo, $('contato').value, $('passos').value);
+  msgEditada = false;
+}
+async function copiarMsg(botao) {
+  const txt = $('msg').value;
+  let feito = false;
+  try { await navigator.clipboard.writeText(txt); feito = true; } catch (e) {
+    const t = $('msg'); t.focus(); t.select();
+    try { feito = document.execCommand('copy'); } catch (e2) {}
+  }
+  const original = botao.textContent;
+  botao.textContent = feito ? 'Copiado ✓' : 'Não deu: selecione e copie';
+  setTimeout(() => { botao.textContent = original; }, 2000);
+}
+
 function atualizar() {
   if (!modelo) return;
   const av = $('avaliacoes').value.trim();
@@ -725,6 +855,7 @@ function atualizar() {
   aplicarRotas(modelo, $('rotas').checked);
   $('preview').innerHTML = render(modelo, { gbp: $('fzGbp').value, ads: $('fzAds').value, site: $('fzSite').value }, $('passos').value);
   $('previewTitle').hidden = false;
+  refazerMsg(false);
   mostrarAlertas(modelo);
   ajustarZoom();
 }
@@ -741,7 +872,9 @@ function gerar() {
     modelo.logo = lerLogo(modelo.cliente);
     mostrarLogo();
     $('passos').value = sugestoes(modelo);
-    $('extras').hidden = false;
+    $('contato').value = lerContato(modelo.cliente);
+    msgEditada = false;
+    $('extras').hidden = $('menu').hidden = $('acoes').hidden = false;
     document.title = `${modelo.cliente} · ${modelo.periodo}`;
     atualizar();
   } catch (e) {
@@ -783,6 +916,12 @@ const EXEMPLO = [
 $('btnGerar').onclick = gerar;
 $('btnExemplo').onclick = () => { $('entrada').value = EXEMPLO; ['fzGbp', 'fzAds', 'fzSite', 'avaliacoes'].forEach(id => $(id).value = ''); gerar(); };
 $('btnAtualizar').onclick = atualizar;
+$('btnCopiar').onclick = () => copiarMsg($('btnCopiar'));
+$('btnCopiar2').onclick = () => { atualizar(); copiarMsg($('btnCopiar2')); };
+$('btnRefazer').onclick = () => refazerMsg(true);
+$('msg').oninput = () => { msgEditada = true; };
+$('contato').oninput = () => { if (modelo) guardarContato(modelo.cliente, $('contato').value.trim()); refazerMsg(false); };
+$('passos').addEventListener('input', () => refazerMsg(false));
 $('btnPdf').onclick = () => { atualizar(); window.print(); };
 ['fzGbp', 'fzAds', 'fzSite'].forEach(id => $(id).oninput = () => modelo && mostrarAlertas(modelo));
 $('logoArq').onchange = async () => {
