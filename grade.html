@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grade de Posições</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #14171c; --ink-2: #4a505a; --muted: #7a808a; --line: #e3e5e9;
+    --bg: #f3f4f6; --card: #ffffff; --accent: #1f56c2;
+    --top: #1f9d55; --mid: #e08a00; --low: #d64545; --none: #5b6170; --empty: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: Inter, system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 24px; font-weight: 800; letter-spacing: -.01em; }
+  .sub { color: var(--ink-2); font-size: 14px; line-height: 1.5; margin-top: 4px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-top: 16px; }
+  .card h2 { font-size: 16px; font-weight: 800; margin-bottom: 10px; }
+  details.card summary { font-size: 16px; font-weight: 800; cursor: pointer; list-style: none; }
+  details.card summary::after { content: " ▾"; color: var(--muted); }
+  details[open].card summary::after { content: " ▴"; }
+  ol.guia { margin: 12px 0 0 18px; display: flex; flex-direction: column; gap: 10px; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+  ol.guia b { color: var(--ink); }
+  code { background: var(--bg); border-radius: 5px; padding: 1px 5px; font-size: 13px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
+  label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 5px; }
+  label small { font-weight: 400; color: var(--muted); }
+  input, select { width: 100%; font: 15px Inter, system-ui, sans-serif; padding: 10px 11px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); }
+  .seg { display: flex; gap: 6px; }
+  .seg button { flex: 1; }
+  button { font: 600 14px Inter, system-ui, sans-serif; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; }
+  button.on, button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .msg { font-size: 13px; margin-top: 10px; color: var(--low); }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.45; }
+
+  .board { display: grid; gap: 6px; margin-top: 6px; }
+  .cell { border-radius: 12px; border: 2px solid var(--line); background: var(--empty); padding: 6px 4px 7px; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+  .cell .lbl { font-size: 10px; color: var(--muted); font-weight: 600; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .cell a { font-size: 12px; font-weight: 700; color: var(--accent); text-decoration: none; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--accent); }
+  .cell a.visto { color: var(--muted); border-color: var(--line); }
+  .cell input { width: 100%; max-width: 64px; text-align: center; font-weight: 800; font-size: 16px; padding: 6px 2px; }
+  .cell.top { background: var(--top); border-color: var(--top); }
+  .cell.mid { background: var(--mid); border-color: var(--mid); }
+  .cell.low { background: var(--low); border-color: var(--low); }
+  .cell.none { background: var(--none); border-color: var(--none); }
+  .cell.top .lbl, .cell.mid .lbl, .cell.low .lbl, .cell.none .lbl { color: rgba(255,255,255,.85); }
+  .cell.top a, .cell.mid a, .cell.low a, .cell.none a { color: #fff; border-color: rgba(255,255,255,.7); }
+  .cell.center { outline: 3px dashed var(--ink); outline-offset: 2px; }
+  .compass { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-weight: 700; margin-top: 8px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--ink-2); margin-top: 12px; }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+  .kpi { background: var(--bg); border-radius: 10px; padding: 10px; }
+  .kpi .n { font-size: 22px; font-weight: 800; }
+  .kpi .t { font-size: 12px; color: var(--ink-2); margin-top: 2px; line-height: 1.3; }
+  .leitura { font-size: 14px; line-height: 1.5; color: var(--ink-2); margin-top: 12px; }
+  .leitura b { color: var(--ink); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  th, td { text-align: left; padding: 8px 4px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  td button { padding: 5px 9px; font-size: 12px; }
+  .empty { font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Grade de Posições</h1>
+  <p class="sub">Descubra em que posição um Perfil aparece no Google Maps em vários pontos da cidade. Nada é pesquisado automaticamente: a página só monta os links, você abre cada um e anota a posição.</p>
+
+  <details class="card" id="guia" open>
+    <summary>Como usar (leia na primeira vez)</summary>
+    <ol class="guia">
+      <li><b>Abra esta página numa janela anônima</b> (Ctrl+Shift+N no Chrome). Assim, os links também abrem no anônimo, sem o seu histórico e sem login. Prefira o computador: no celular, o link pode abrir no app do Maps e usar a sua localização real.</li>
+      <li><b>Pegue o centro.</b> No Google Maps, clique com o botão direito em cima do endereço do cliente e clique no primeiro item, que são as coordenadas (algo como <code>-21.7545, -41.3244</code>). Elas são copiadas. Cole no campo "Centro". Também dá para colar o link inteiro do Google Maps.</li>
+      <li><b>Escreva a busca</b> exatamente como o cliente do seu cliente digitaria, por exemplo <code>guincho</code> ou <code>locação de vans</code>. Se quiser testar com a cidade, escreva junto: <code>locação de vans em campos dos goytacazes</code>.</li>
+      <li><b>Escolha a grade e a distância.</b> 3×3 = 9 buscas, para um retrato rápido. 5×5 = 25 buscas, para o retrato completo. Distância entre pontos: 1 a 2 km em cidade média, 3 a 5 km se o cliente atende a região toda.</li>
+      <li><b>Clique em "Abrir" em cada quadrado.</b> No Maps, conte em que posição o cliente aparece na lista da esquerda, <b>sem contar</b> os marcados "Patrocinado". Role a lista até uns 20 resultados.</li>
+      <li><b>Digite a posição no quadrado.</b> Se não achar até o 20º, digite <code>x</code>. A cor muda sozinha.</li>
+      <li><b>Salve a medição.</b> Ela fica guardada neste navegador. Depois de uma mudança no Perfil, espere de 2 a 3 semanas, meça de novo com <b>a mesma busca, o mesmo centro, a mesma grade e a mesma distância</b>, e compare.</li>
+    </ol>
+    <p class="hint">O Maps ordena pela área que aparece na tela, que é uma aproximação do que alguém vê buscando daquele ponto. Serve muito bem para comparar antes e depois, desde que a medição seja sempre feita do mesmo jeito.</p>
+  </details>
+
+  <section class="card">
+    <h2>1. Configurar</h2>
+    <div class="grid2">
+      <div><label for="cliente">Cliente <small>(nome do Perfil)</small></label><input id="cliente" placeholder="Ex.: R & A Locações e Turismo"></div>
+      <div><label for="busca">Busca</label><input id="busca" placeholder="Ex.: locação de vans"></div>
+      <div><label for="centro">Centro <small>(coordenadas ou link do Maps)</small></label><input id="centro" placeholder="-21.7545, -41.3244"></div>
+      <div><label for="dist">Distância entre pontos</label>
+        <select id="dist"><option value="0.5">500 m</option><option value="1">1 km</option><option value="2" selected>2 km</option><option value="3">3 km</option><option value="5">5 km</option></select></div>
+    </div>
+    <label style="margin-top:12px">Tamanho da grade</label>
+    <div class="seg"><button data-n="3" class="on">3×3 · 9 buscas</button><button data-n="5">5×5 · 25 buscas</button></div>
+    <div class="row"><button class="primary" id="btnMontar">Montar grade</button></div>
+    <p class="msg" id="msg"></p>
+  </section>
+
+  <section class="card" id="cardGrade" hidden>
+    <h2>2. Abrir cada ponto e anotar a posição</h2>
+    <p class="hint">Norte em cima. O quadrado tracejado é o centro.</p>
+    <div class="compass"><span>Oeste</span><span>Norte ↑</span><span>Leste</span></div>
+    <div class="board" id="board"></div>
+    <div class="legend">
+      <span><i style="background:var(--top)"></i>1º a 3º (aparece no mapa da busca)</span>
+      <span><i style="background:var(--mid)"></i>4º a 10º</span>
+      <span><i style="background:var(--low)"></i>11º a 20º</span>
+      <span><i style="background:var(--none)"></i>não apareceu (x)</span>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <p class="leitura" id="leitura"></p>
+    <div class="row">
+      <button class="primary" id="btnSalvar">Salvar medição</button>
+      <button id="btnCopiar">Copiar resumo</button>
+      <button id="btnLimpar">Limpar posições</button>
+    </div>
+    <p class="hint" id="salvoMsg"></p>
+  </section>
+
+  <section class="card">
+    <h2>3. Medições salvas</h2>
+    <div id="historico"><p class="empty">Nenhuma medição salva ainda.</p></div>
+    <p class="hint">Ficam só neste navegador. Na janela anônima, elas somem ao fechar a janela, então use "Copiar resumo" antes de fechar, ou salve numa janela normal.</p>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const KEY = 'grade-posicoes-v1';
+let N = 3, pontos = [], cfg = null;
+
+/* ---------- Leitura das coordenadas ---------- */
+function lerCentro(txt) {
+  txt = (txt || '').trim();
+  let m = txt.match(/@(-?\d+\.\d+),\s*(-?\d+\.\d+)/) || txt.match(/(-?\d{1,2}\.\d+)\s*[,;\s]\s*(-?\d{1,3}\.\d+)/);
+  if (!m) return null;
+  const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  return { lat, lng };
+}
+
+/* ---------- Pontos da grade ---------- */
+function montarPontos(c, n, km) {
+  const half = (n - 1) / 2, out = [];
+  const dLat = km / 111.32, dLng = km / (111.32 * Math.cos(c.lat * Math.PI / 180));
+  for (let r = 0; r < n; r++) for (let col = 0; col < n; col++) {
+    const dy = half - r, dx = col - half;
+    out.push({ lat: +(c.lat + dy * dLat).toFixed(6), lng: +(c.lng + dx * dLng).toFixed(6), dy, dx, pos: '' });
+  }
+  return out;
+}
+function rotulo(p, km) {
+  if (!p.dx && !p.dy) return 'centro';
+  const ns = p.dy > 0 ? 'N' : p.dy < 0 ? 'S' : '', lo = p.dx > 0 ? 'L' : p.dx < 0 ? 'O' : '';
+  const dist = Math.hypot(p.dx, p.dy) * km;
+  return `${ns}${lo} ${dist < 1 ? Math.round(dist * 1000) + ' m' : dist.toFixed(1).replace('.0', '').replace('.', ',') + ' km'}`;
+}
+const zoom = km => km <= 0.5 ? 16 : km <= 2 ? 15 : km <= 3 ? 14 : 13;
+const link = (p, busca, km) => `https://www.google.com/maps/search/${encodeURIComponent(busca).replace(/%20/g, '+')}/@${p.lat},${p.lng},${zoom(km)}z?hl=pt-BR`;
+
+/* ---------- Classificação ---------- */
+function valor(s) {
+  s = String(s).trim().toLowerCase();
+  if (!s) return null;
+  if (s === 'x' || s === '-' || s === '0') return 'x';
+  const n = parseInt(s, 10);
+  return n >= 1 ? n : null;
+}
+function classe(v) { return v === null ? '' : v === 'x' ? 'none' : v <= 3 ? 'top' : v <= 10 ? 'mid' : v <= 20 ? 'low' : 'none'; }
+
+function resumo() {
+  const vals = pontos.map(p => valor(p.pos));
+  const feitos = vals.filter(v => v !== null);
+  const top3 = feitos.filter(v => v !== 'x' && v <= 3).length;
+  const ap = feitos.filter(v => v !== 'x' && v <= 20);
+  const media = ap.length ? ap.reduce((a, b) => a + b, 0) / ap.length : null;
+  return { total: pontos.length, feitos: feitos.length, top3, media, naoAparece: feitos.length - ap.length, vals };
+}
+
+/* ---------- Tela ---------- */
+function desenhar() {
+  const km = cfg.km, board = $('board');
+  board.style.gridTemplateColumns = `repeat(${N}, minmax(0, 1fr))`;
+  board.innerHTML = pontos.map((p, i) => {
+    const c = classe(valor(p.pos));
+    return `<div class="cell ${c}${!p.dx && !p.dy ? ' center' : ''}" id="c${i}">
+      <span class="lbl">${rotulo(p, km)}</span>
+      <a href="${link(p, cfg.busca, km)}" target="_blank" rel="noopener" data-i="${i}"${p.visto ? ' class="visto"' : ''}>Abrir</a>
+      <input inputmode="numeric" maxlength="3" value="${p.pos}" data-i="${i}" aria-label="Posição no ponto ${rotulo(p, km)}" placeholder="—">
+    </div>`;
+  }).join('');
+  board.querySelectorAll('input').forEach(inp => inp.addEventListener('input', e => {
+    const i = +e.target.dataset.i; pontos[i].pos = e.target.value;
+    const cell = $('c' + i); cell.className = `cell ${classe(valor(e.target.value))}${!pontos[i].dx && !pontos[i].dy ? ' center' : ''}`;
+    atualizarResumo();
+  }));
+  board.querySelectorAll('a').forEach(a => a.addEventListener('click', e => { pontos[+e.target.dataset.i].visto = true; e.target.classList.add('visto'); }));
+  atualizarResumo();
+}
+
+function atualizarResumo() {
+  const r = resumo();
+  $('kpis').innerHTML = `
+    <div class="kpi"><div class="n">${r.feitos ? Math.round(r.top3 / r.feitos * 100) + '%' : '—'}</div><div class="t">dos pontos no top 3</div></div>
+    <div class="kpi"><div class="n">${r.media ? r.media.toFixed(1).replace('.', ',') + 'º' : '—'}</div><div class="t">posição média onde aparece</div></div>
+    <div class="kpi"><div class="n">${r.feitos}/${r.total}</div><div class="t">pontos anotados</div></div>`;
+  $('leitura').innerHTML = leitura(r);
+}
+
+function leitura(r) {
+  if (r.feitos < r.total) return `Faltam ${r.total - r.feitos} pontos. A leitura aparece quando todos estiverem anotados.`;
+  const centro = valor(pontos.find(p => !p.dx && !p.dy).pos);
+  const borda = pontos.filter(p => Math.max(Math.abs(p.dx), Math.abs(p.dy)) === (N - 1) / 2).map(p => valor(p.pos));
+  const bordaTop = borda.filter(v => v !== 'x' && v <= 3).length;
+  const cliente = cfg.cliente || 'O perfil';
+  let t = `<b>${esc(cliente)}</b> aparece no top 3 em <b>${r.top3} de ${r.total}</b> pontos para "${esc(cfg.busca)}". `;
+  if (centro !== 'x' && centro <= 3 && bordaTop === 0) t += 'É forte perto do centro e some nas bordas: <b>efeito da distância</b>. Para crescer nas bordas, o caminho é relevância e reputação (categoria, serviços, fotos, ritmo de avaliações).';
+  else if (centro === 'x' || centro > 3) t += 'Nem no centro ele está no top 3. <b>Comece pelo básico do Perfil</b>: categoria principal, serviços e avaliações. Depois, meça de novo.';
+  else if (bordaTop >= borda.length / 2) t += 'Está forte inclusive nas bordas. <b>Vale aumentar a distância</b> na próxima medição para achar o limite.';
+  else t += 'Está forte no centro e em parte das bordas.';
+  if (r.naoAparece) t += ` Em ${r.naoAparece} ${r.naoAparece === 1 ? 'ponto ele não apareceu' : 'pontos ele não apareceu'} até o 20º.`;
+  return t;
+}
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- Ações ---------- */
+document.querySelectorAll('.seg button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.seg button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on'); N = +b.dataset.n;
+});
+
+$('btnMontar').onclick = () => {
+  const c = lerCentro($('centro').value), busca = $('busca').value.trim();
+  if (!busca) return $('msg').textContent = 'Escreva a busca.';
+  if (!c) return $('msg').textContent = 'Não entendi o centro. Cole as coordenadas (ex.: -21.7545, -41.3244) ou o link do Google Maps.';
+  $('msg').textContent = '';
+  cfg = { cliente: $('cliente').value.trim(), busca, c, km: +$('dist').value, n: N };
+  pontos = montarPontos(c, N, cfg.km);
+  $('cardGrade').hidden = false; $('salvoMsg').textContent = '';
+  desenhar();
+  $('guia').open = false;
+  $('cardGrade').scrollIntoView({ behavior: 'smooth' });
+};
+
+$('btnLimpar').onclick = () => { pontos.forEach(p => { p.pos = ''; p.visto = false; }); desenhar(); };
+
+function texto() {
+  const r = resumo(), linhas = [];
+  for (let i = 0; i < N; i++) linhas.push(pontos.slice(i * N, i * N + N).map(p => (valor(p.pos) ?? '—').toString().padStart(2, ' ')).join('  '));
+  return `Grade de Posições · ${new Date().toLocaleDateString('pt-BR')}
+Cliente: ${cfg.cliente || '-'}
+Busca: ${cfg.busca}
+Centro: ${cfg.c.lat}, ${cfg.c.lng} · Grade ${N}×${N} · ${cfg.km} km entre pontos
+Top 3: ${r.top3}/${r.total} pontos · Posição média: ${r.media ? r.media.toFixed(1) : '-'} · Não apareceu: ${r.naoAparece}
+(norte em cima)
+${linhas.join('\n')}`;
+}
+
+$('btnCopiar').onclick = async () => {
+  try { await navigator.clipboard.writeText(texto()); $('salvoMsg').textContent = 'Resumo copiado. Cole onde quiser (WhatsApp, planilha, relatório).'; }
+  catch { $('salvoMsg').textContent = 'Não consegui copiar automaticamente neste navegador.'; }
+};
+
+function lerHist() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; } }
+function gravarHist(h) { try { localStorage.setItem(KEY, JSON.stringify(h)); return true; } catch { return false; } }
+
+$('btnSalvar').onclick = () => {
+  const r = resumo();
+  if (!r.feitos) return $('salvoMsg').textContent = 'Anote pelo menos um ponto antes de salvar.';
+  const h = lerHist();
+  h.unshift({ data: new Date().toISOString(), cfg, pontos: pontos.map(p => ({ ...p, visto: false })), top3: r.top3, total: r.total, media: r.media });
+  $('salvoMsg').textContent = gravarHist(h.slice(0, 60)) ? 'Medição salva neste navegador.' : 'Não deu para salvar neste navegador. Use "Copiar resumo".';
+  mostrarHist();
+};
+
+function mostrarHist() {
+  const h = lerHist();
+  if (!h.length) { $('historico').innerHTML = '<p class="empty">Nenhuma medição salva ainda.</p>'; return; }
+  $('historico').innerHTML = `<table><tr><th>Data</th><th>Cliente · busca</th><th>Top 3</th><th>Média</th><th></th></tr>${h.map((m, i) => `
+    <tr><td>${new Date(m.data).toLocaleDateString('pt-BR')}</td><td>${esc(m.cfg.cliente || '-')} · ${esc(m.cfg.busca)}<br><small style="color:var(--muted)">${m.cfg.n}×${m.cfg.n}, ${m.cfg.km} km</small></td>
+    <td>${m.top3}/${m.total}</td><td>${m.media ? m.media.toFixed(1).replace('.', ',') + 'º' : '—'}</td>
+    <td><button data-abrir="${i}">Abrir</button> <button data-repetir="${i}">Medir de novo</button> <button data-apagar="${i}">Apagar</button></td></tr>`).join('')}</table>`;
+  $('historico').querySelectorAll('button').forEach(b => b.onclick = () => {
+    const h = lerHist();
+    if (b.dataset.apagar) { h.splice(+b.dataset.apagar, 1); gravarHist(h); return mostrarHist(); }
+    const m = h[+(b.dataset.abrir ?? b.dataset.repetir)];
+    cfg = m.cfg; N = m.cfg.n;
+    $('cliente').value = cfg.cliente; $('busca').value = cfg.busca; $('centro').value = `${cfg.c.lat}, ${cfg.c.lng}`; $('dist').value = String(cfg.km);
+    document.querySelectorAll('.seg button').forEach(x => x.classList.toggle('on', +x.dataset.n === N));
+    pontos = b.dataset.repetir ? montarPontos(cfg.c, N, cfg.km) : m.pontos.map(p => ({ ...p }));
+    $('cardGrade').hidden = false; $('salvoMsg').textContent = b.dataset.repetir ? 'Mesma configuração da medição anterior. Anote as novas posições e salve.' : '';
+    desenhar(); $('cardGrade').scrollIntoView({ behavior: 'smooth' });
+  });
+}
+mostrarHist();
+</script>
+</body>
+</html>
