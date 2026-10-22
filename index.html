@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gerador de Relatórios</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  @page { size: 108mm 192mm; margin: 0; }
+  :root {
+    --ink: #14171c; --ink-2: #4a505a; --muted: #7a808a;
+    --paper: #ffffff; --soft: #f3f4f6; --line: #e3e5e9; --bg: #e9ebef;
+    --accent: #1f56c2; --prev: #b9bec7; --warn-bg: #fff6d6; --warn-ink: #6b4e00;
+    --err-bg: #fde8e6; --err-ink: #8a1c12;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--ink); font-family: Inter, "DejaVu Sans", system-ui, sans-serif; }
+
+  /* ---------- Painel de uso (não sai no PDF) ---------- */
+  .ui { max-width: 720px; margin: 0 auto; padding: 20px 16px 8px; }
+  .ui h1 { font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
+  .ui .sub { font-size: 14px; color: var(--ink-2); margin-top: 4px; line-height: 1.45; }
+  .ui label { display: block; font-size: 13px; font-weight: 700; margin: 16px 0 6px; }
+  .ui label small { font-weight: 400; color: var(--muted); }
+  .ui textarea { width: 100%; min-height: 120px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; font: 13px/1.4 ui-monospace, Menlo, monospace; background: #fff; color: var(--ink); resize: vertical; }
+  .ui textarea.prose { font: 14px/1.45 Inter, system-ui, sans-serif; min-height: 96px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  button { font: 600 14px Inter, system-ui, sans-serif; border-radius: 10px; padding: 11px 16px; border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .alerts { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+  .alert { font-size: 13px; line-height: 1.4; padding: 9px 12px; border-radius: 9px; background: var(--warn-bg); color: var(--warn-ink); }
+  .alert.err { background: var(--err-bg); color: var(--err-ink); }
+  .alert.ok { background: #e6f4ea; color: #1d5e2c; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+  #extras[hidden] { display: none; }
+  .preview-title { max-width: 720px; margin: 18px auto 0; padding: 0 16px; font-size: 13px; font-weight: 700; color: var(--ink-2); }
+  #preview { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 12px 16px 40px; }
+
+  /* ---------- Páginas do relatório ---------- */
+  .page {
+    width: 108mm; height: 192mm; padding: 11mm 9mm 9mm; position: relative; background: var(--paper);
+    display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.08);
+  }
+  .tag { font-size: 8.5pt; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  .page h1 { font-size: 25pt; line-height: 1.08; font-weight: 800; letter-spacing: -.02em; margin-top: 4mm; }
+  .page h2 { font-size: 19pt; line-height: 1.12; font-weight: 800; letter-spacing: -.015em; margin-top: 3mm; }
+  .page p { font-size: 11pt; line-height: 1.45; color: var(--ink-2); margin-top: 3.5mm; }
+  .page p b, .page li b { color: var(--ink); }
+  .nb { white-space: nowrap; }
+  .hero { font-size: 60pt; font-weight: 800; line-height: 1; letter-spacing: -.03em; margin-top: 6mm; color: var(--accent); }
+  .hero small { font-size: 13pt; font-weight: 600; color: var(--ink-2); letter-spacing: 0; display: block; margin-top: 2mm; }
+  .foot { margin-top: auto; font-size: 8pt; color: var(--muted); display: flex; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 2.5mm; }
+  .card { background: var(--soft); border-radius: 4mm; padding: 4mm; margin-top: 4mm; }
+  .note { background: var(--warn-bg); color: var(--warn-ink); border-radius: 3mm; padding: 3mm 3.5mm; font-size: 9pt; line-height: 1.4; margin-top: 4mm; }
+  .q { font-size: 13pt; font-weight: 600; color: var(--ink-2); line-height: 1.35; margin-top: 5mm; }
+  .bars { margin-top: 4mm; display: flex; flex-direction: column; gap: 3mm; }
+  .bar .lbl { display: flex; justify-content: space-between; font-size: 9.5pt; color: var(--ink-2); margin-bottom: 1mm; gap: 2mm; }
+  .bar .lbl b { color: var(--ink); font-size: 11pt; }
+  .bar .lbl .was { color: var(--muted); }
+  .track { height: 5mm; display: flex; }
+  .fill { height: 100%; border-radius: 0 1.2mm 1.2mm 0; background: var(--accent); min-width: 1mm; }
+  .fill.prev { background: var(--prev); }
+  .pair { display: flex; flex-direction: column; gap: 1mm; }
+  .legend { display: flex; gap: 5mm; font-size: 8.5pt; color: var(--ink-2); margin-top: 4mm; }
+  .legend i { display: inline-block; width: 3mm; height: 3mm; border-radius: .8mm; margin-right: 1.5mm; vertical-align: -0.3mm; }
+  .cols { display: flex; align-items: flex-end; gap: 6mm; height: 40mm; margin-top: 6mm; border-bottom: 1.5px solid var(--ink-2); padding: 0 4mm; }
+  .col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  .col .v { font-size: 12pt; font-weight: 700; margin-bottom: 1.5mm; }
+  .col .c { width: 100%; border-radius: 1.2mm 1.2mm 0 0; background: var(--prev); min-height: 1mm; }
+  .col .c.now { background: var(--accent); }
+  .colx { display: flex; gap: 6mm; padding: 0 4mm; margin-top: 1.5mm; }
+  .colx span { flex: 1; text-align: center; font-size: 9pt; color: var(--ink-2); }
+  .caption { font-size: 9pt !important; text-align: center; margin-top: 2mm !important; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; margin-top: 4mm; }
+  .stats.one { grid-template-columns: 1fr; }
+  .stat { background: var(--soft); border-radius: 3mm; padding: 3mm; }
+  .stat .n { font-size: 20pt; font-weight: 800; letter-spacing: -.02em; }
+  .stat .t { font-size: 8.5pt; color: var(--ink-2); line-height: 1.3; margin-top: .5mm; }
+  .stat .d { font-size: 8.5pt; color: var(--muted); margin-top: 1mm; }
+  ol.acts, ul.done { list-style: none; margin-top: 3mm; display: flex; flex-direction: column; gap: 3mm; }
+  ol.acts li, ul.done li { background: var(--soft); border-radius: 3mm; padding: 3mm 3.5mm; font-size: 10pt; line-height: 1.4; color: var(--ink-2); }
+  ul.done li b { color: var(--ink); }
+  ol.acts .who { font-size: 7.5pt; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); display: block; }
+  ol.acts .what { color: var(--ink); font-weight: 600; }
+  ol.acts .how { display: block; font-size: 8.5pt; color: var(--muted); margin-top: 1mm; }
+  table { width: 100%; border-collapse: collapse; margin-top: 3mm; font-size: 8.6pt; }
+  th { text-align: right; font-weight: 600; color: var(--muted); padding: 1.4mm 0; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  td { text-align: right; padding: 1.5mm 0; border-bottom: 1px solid var(--line); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  td:last-child { color: var(--ink); font-weight: 600; }
+  tr.sec td { color: var(--accent); font-weight: 700; font-size: 7.5pt; letter-spacing: .06em; text-transform: uppercase; padding-top: 3mm; border-bottom: none; }
+  .terms { margin-top: 4mm; display: flex; flex-direction: column; gap: 2.5mm; }
+  .term { background: var(--soft); border-radius: 3mm; padding: 3mm 3.5mm; display: flex; justify-content: space-between; align-items: baseline; }
+  .term { gap: 2mm; }
+  .term .t { font-size: 11pt; font-weight: 600; color: var(--ink); flex: 1; min-width: 0; }
+  .term span { font-size: 9pt; color: var(--ink-2); white-space: nowrap; margin-left: 2mm; }
+  .term span b { color: var(--ink); font-size: 12pt; }
+
+  @media print {
+    html, body { background: #fff; }
+    .ui, .preview-title { display: none !important; }
+    #preview { display: block; padding: 0; }
+    .page { box-shadow: none; zoom: 1 !important; page-break-after: always; break-after: page; }
+    .page:last-child { page-break-after: auto; break-after: auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="ui">
+  <h1>Gerador de Relatórios</h1>
+  <p class="sub">Cole a tabela de placeholders que o seu app gera (ou um JSON) e toque em <b>Gerar</b>. O relatório se ajusta aos canais que vierem: só GBP, só Ads ou os dois. Os dados ficam só no seu navegador e não são enviados a lugar nenhum.</p>
+
+  <label for="entrada">Dados do mês <small>(tabela do app ou JSON)</small></label>
+  <textarea id="entrada" placeholder="__CLIENTE__	Nome do cliente&#10;__PERIODO__	Outubro/2026&#10;..."></textarea>
+  <div class="row">
+    <button class="primary" id="btnGerar">Gerar relatório</button>
+    <button id="btnExemplo">Carregar exemplo (cliente fictício)</button>
+  </div>
+  <div class="alerts" id="alertas"></div>
+
+  <div id="extras" hidden>
+    <label for="fizemos">O que fizemos no mês <small>(uma ação por linha, em linguagem de cliente)</small></label>
+    <textarea id="fizemos" class="prose" placeholder="Cadastramos o serviço &quot;auto socorro&quot; no seu Perfil.&#10;Tiramos dos anúncios as buscas que gastavam sem trazer contato."></textarea>
+    <label for="passos">Próximos passos <small>(até 3; formato: Você/Nós: ação | Como saber: ...)</small></label>
+    <textarea id="passos" class="prose"></textarea>
+    <p class="hint">Os próximos passos vêm pré-preenchidos com sugestões calculadas a partir dos números. Revise antes de enviar.</p>
+    <div class="row">
+      <button id="btnAtualizar">Atualizar relatório</button>
+      <button class="primary" id="btnPdf">Baixar PDF</button>
+    </div>
+    <p class="hint">No computador (Chrome ou Edge): em "Destino", escolha <b>Salvar como PDF</b>. No celular, use Compartilhar → Imprimir → Salvar como PDF.</p>
+  </div>
+</div>
+
+<div class="preview-title" id="previewTitle" hidden>Pré-visualização</div>
+<div id="preview"></div>
+
+<script>
+/* ============================================================
+   1. Leitura da entrada
+   ============================================================ */
+const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+
+function lerEntrada(txt) {
+  txt = txt.trim();
+  const out = {};
+  if (txt.startsWith('{')) {
+    const obj = JSON.parse(txt);
+    for (const [k, v] of Object.entries(obj)) {
+      const key = k.startsWith('__') ? k : '__' + k.toUpperCase() + '__';
+      out[key] = v == null ? '' : String(v);
+    }
+    return out;
+  }
+  for (const linha of txt.split(/\r?\n/)) {
+    const m = linha.match(/^\s*(__[A-Z0-9_]+__)\s*(.*)$/);
+    if (m) out[m[1]] = m[2].trim();
+  }
+  return out;
+}
+
+function num(v) {
+  if (v == null) return NaN;
+  let s = String(v).replace(/R\$/g, '').replace(/\s/g, '').replace(/%$/, '');
+  if (!s || !/[0-9]/.test(s)) return NaN;
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(s);
+  return isFinite(n) ? n : NaN;
+}
+const ok = n => typeof n === 'number' && isFinite(n);
+
+function tabela(html) {
+  if (!html || !html.includes('<t')) return [];
+  const doc = new DOMParser().parseFromString('<table>' + html.replace(/<\/?table[^>]*>/g, '') + '</table>', 'text/html');
+  return [...doc.querySelectorAll('tr')].map(tr => [...tr.children].map(td => td.textContent.trim()));
+}
+
+function mesInfo(periodo) {
+  const m = String(periodo || '').toLowerCase().match(/([a-zç]+)\s*\/\s*(\d{4})/);
+  if (!m) return { nome: periodo || '', dias: 30 };
+  const i = MESES.indexOf(m[1]);
+  const nome = m[1].charAt(0).toUpperCase() + m[1].slice(1);
+  return { nome, dias: i >= 0 ? new Date(+m[2], i + 1, 0).getDate() : 30 };
+}
+const curto = s => String(s || '').split('/')[0];
+
+/* ============================================================
+   2. Modelo de dados
+   ============================================================ */
+function montarModelo(P) {
+  const D = { P, alertas: [] };
+  D.cliente = P.__CLIENTE__ || 'Cliente';
+  D.periodo = P.__PERIODO__ || '';
+  D.mes = mesInfo(D.periodo);
+  D.resp = P.__RESPONSAVEL__ || '';
+  D.data = P.__DATA_GERACAO__ || new Date().toLocaleDateString('pt-BR');
+
+  // Comparativo com o mês anterior
+  const cmpRows = tabela(P.__COMPARATIVO_TABELA__ || P.__COMPARATIVO_BLOCO__);
+  const cmp = {};
+  if (cmpRows.length > 1) {
+    D.mesAnt = curto(cmpRows[0][1]);
+    for (const r of cmpRows.slice(1)) cmp[r[0].toLowerCase()] = [num(r[1]), num(r[2])];
+  }
+  const ant = rotulo => (cmp[rotulo.toLowerCase()] || [NaN])[0];
+
+  D.invest = { cur: num(P.__INVESTIMENTO_TOTAL__), prev: ant('Investimento total') };
+
+  // Ads
+  const adsAcoes = num(P.__ADS_ACOES__ ?? P.__ADS_CONV__);
+  const adsCusto = num(P.__ADS_CUSTO__);
+  if ((ok(adsAcoes) && adsAcoes > 0) || (ok(adsCusto) && adsCusto > 0)) {
+    const evol = tabela(P.__ADS_EVOLUCAO_HTML__);
+    let custoAnt = NaN;
+    if (evol.length > 2) custoAnt = num(evol[evol.length - 2][1]);
+    D.ads = {
+      acoes: ok(adsAcoes) ? adsAcoes : 0, custo: adsCusto,
+      ligDir: num(P.__ADS_LIGACOES_DIRETAS__), waDir: num(P.__ADS_WHATSAPP_DIRETO__),
+      telPerf: num(P.__ADS_TELEFONE_PERFIL__), waPerf: num(P.__ADS_WHATSAPP_PERFIL__),
+      outras: num(P.__ADS_OUTRAS_ACOES__), rotas: num(P.__ADS_PEDIDOS_ROTA__),
+      prev: {
+        acoes: ant('Ações dos anúncios'), ligDir: ant('Ligações diretas (anúncio)'), waDir: ant('WhatsApp direto (anúncio)'),
+        telPerf: ant('Telefone pelo perfil (anúncio)'), waPerf: ant('WhatsApp pelo perfil (anúncio)'), custo: custoAnt
+      },
+      campanhas: tabela(P.__ADS_CAMPANHAS_TABELA__).slice(1),
+      palavras: tabela(P.__ADS_TOP_PALAVRAS_TABELA__).slice(1)
+    };
+  }
+
+  // GBP
+  const gbpAcoes = num(P.__GBP_ACOES__ ?? P.__GBP_INTERACOES__);
+  const gbpImp = num(P.__GBP_IMPRESSOES__);
+  if ((ok(gbpAcoes) && gbpAcoes > 0) || (ok(gbpImp) && gbpImp > 0)) {
+    const evol = tabela(P.__GBP_EVOLUCAO_HTML__).slice(1).map(r => ({ mes: curto(r[0]), v: num(r[1]) })).filter(x => ok(x.v));
+    D.gbp = {
+      acoes: ok(gbpAcoes) ? gbpAcoes : 0, imp: gbpImp,
+      ligar: num(P.__GBP_CLIQUES_LIGAR__ ?? P.__GBP_CHAMADAS__), wa: num(P.__GBP_CLIQUES_WHATSAPP__ ?? P.__GBP_MENSAGENS__),
+      site: num(P.__GBP_CLIQUES_SITE__ ?? P.__GBP_CLIQUES__), rotas: num(P.__GBP_PEDIDOS_ROTA__ ?? P.__GBP_ROTAS__),
+      prev: {
+        acoes: ant('Ações do Perfil no Google'), ligar: ant('Cliques para ligar (Perfil)'),
+        wa: ant('Cliques no WhatsApp (Perfil)'), site: ant('Cliques no site (Perfil)')
+      },
+      evol
+    };
+  }
+
+  // Hipótese de fechamento
+  const hip = P.__ESTIMATIVA_HIPOTESE__ || '';
+  const mp = hip.match(/(\d+(?:[.,]\d+)?)\s*%/);
+  const mt = hip.match(/ticket[^R]*R\$\s*([\d.,]+)/i);
+  D.hip = { pct: mp ? num(mp[1]) / 100 : NaN, ticket: mt ? num(mt[1]) : NaN };
+
+  D.fizemos = (P.__ATIVIDADES_MES__ || '').trim();
+  validar(D);
+  return D;
+}
+
+/* ============================================================
+   3. Conferências (aparecem só no painel, não no PDF)
+   ============================================================ */
+function validar(D) {
+  const A = D.alertas;
+  if (!D.ads && !D.gbp) A.push(['err', 'Não encontrei dados de Ads nem de GBP. Confira se colou a tabela inteira.']);
+  if (!D.ads) A.push(['info', 'Sem dados de Ads neste mês: as páginas de anúncio ficam fora do relatório.']);
+  if (!D.gbp) A.push(['info', 'Sem dados de GBP neste mês: as páginas do Perfil ficam fora do relatório.']);
+  A.push(['info', 'Site (GA4/Search Console): ainda sem dados. O relatório não mostra o site.']);
+  if (!D.mesAnt) A.push(['warn', 'Não achei o comparativo com o mês anterior. As comparações ficam de fora.']);
+  if (!ok(D.hip.pct) || !ok(D.hip.ticket)) A.push(['warn', 'Não achei a hipótese de fechamento (% e ticket médio). As páginas de retorno ficam de fora.']);
+  if (D.ads) {
+    const a = D.ads;
+    const soma = [a.ligDir, a.waDir, a.telPerf, a.waPerf, a.outras].filter(ok).reduce((x, y) => x + y, 0);
+    if (soma && soma !== a.acoes) A.push(['err', `Ads: as partes somam ${soma}, mas o total é ${a.acoes}. Confira as conversões.`]);
+    const somaCamp = a.campanhas.map(r => num(r[2])).filter(ok).reduce((x, y) => x + y, 0);
+    if (somaCamp && somaCamp !== a.acoes) A.push(['err', `Ads: as campanhas somam ${somaCamp} contatos, mas o total é ${a.acoes}. Pode haver conversão contada duas vezes. A tabela de campanhas não vai para o relatório.`]);
+  }
+  if (D.gbp) {
+    const g = D.gbp;
+    const soma = [g.ligar, g.wa, g.site].filter(ok).reduce((x, y) => x + y, 0);
+    if (soma && soma !== g.acoes) A.push(['warn', `GBP: ligar + WhatsApp + site somam ${soma}, mas o total é ${g.acoes}.`]);
+  }
+  if (D.ads && D.gbp) A.push(['info', 'Ads e GBP são mostrados separados, sem somar, porque a mesma pessoa pode aparecer nos dois.']);
+}
+
+/* ============================================================
+   4. Formatação e textos por regra
+   ============================================================ */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const int = n => Math.round(n).toLocaleString('pt-BR');
+const brl = n => '<span class="nb">R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</span>';
+const brl0 = n => '<span class="nb">R$ ' + Math.round(n).toLocaleString('pt-BR') + '</span>';
+const pctTxt = p => Math.round(p * 100) + '%';
+
+function porDia(total, dias) {
+  const x = total / dias;
+  if (x >= 1) { const lo = Math.floor(x), hi = Math.ceil(x); return lo === hi ? `${lo} por dia` : `${lo} a ${hi} por dia`; }
+  if (x > 0) return `1 a cada ${Math.round(1 / x)} dias`;
+  return 'nenhum por dia';
+}
+
+function vezes(m) {
+  if (m < 1) return 'ainda não cobre o investido';
+  const r = Math.round(m);
+  return (m < r ? 'quase ' : 'cerca de ') + r + (r === 1 ? ' vez' : ' vezes') + ' o investido';
+}
+
+function tendencia(ev) {
+  if (ev.length < 2) return '';
+  const [la, lb, lc] = ev.length >= 3 ? ev.slice(-3).map(e => e.mes) : [null, ev[0].mes, ev[1].mes];
+  const [a, b, c] = ev.length >= 3 ? ev.slice(-3).map(e => e.v) : [null, ev[0].v, ev[1].v];
+  if (a === null) {
+    const dir = c > b ? 'Subiu' : c < b ? 'Caiu' : 'Ficou igual';
+    return `${dir} em relação a ${lb.toLowerCase()}. Com só 2 meses, ainda é cedo para falar em tendência.`;
+  }
+  if (c > b && b < a && Math.abs(c - a) / a <= 0.15) return `${lb} foi o mês fraco. ${lc} <b>voltou ao nível de ${la.toLowerCase()}</b>. Ainda é cedo para chamar isso de tendência de alta.`;
+  if (c < b && b > a && Math.abs(c - a) / a <= 0.15) return `${lb} foi um mês acima do normal. ${lc} <b>voltou ao nível de ${la.toLowerCase()}</b>.`;
+  if (a < b && b < c) return `<b>Segundo mês seguido de alta.</b> É um bom sinal, mas a curva pode mudar.`;
+  if (a > b && b > c) return `<b>Segundo mês seguido de queda.</b> Vale olhar com atenção no próximo mês.`;
+  return c > b ? `Subiu em relação a ${lb.toLowerCase()}.` : c < b ? `Caiu em relação a ${lb.toLowerCase()}.` : `Ficou igual a ${lb.toLowerCase()}.`;
+}
+
+function canais(D) {
+  // WhatsApp x ligação, somando o que existir
+  const wa = [D.ads && D.ads.waDir, D.ads && D.ads.waPerf, D.gbp && D.gbp.wa].filter(ok).reduce((x, y) => x + y, 0);
+  const lig = [D.ads && D.ads.ligDir, D.ads && D.ads.telPerf, D.gbp && D.gbp.ligar].filter(ok).reduce((x, y) => x + y, 0);
+  const waP = [D.ads && D.ads.prev.waDir, D.ads && D.ads.prev.waPerf, D.gbp && D.gbp.prev.wa].filter(ok).reduce((x, y) => x + y, 0);
+  const ligP = [D.ads && D.ads.prev.ligDir, D.ads && D.ads.prev.telPerf, D.gbp && D.gbp.prev.ligar].filter(ok).reduce((x, y) => x + y, 0);
+  return { wa, lig, total: wa + lig, share: wa + lig ? wa / (wa + lig) : NaN, shareP: waP + ligP ? waP / (waP + ligP) : NaN, totalP: waP + ligP, waP };
+}
+
+function cenarios(D) {
+  if (!ok(D.hip.pct) || !ok(D.hip.ticket) || !ok(D.invest.cur) || !D.invest.cur) return null;
+  const taxas = D.hip.pct > 0.1 ? [0.1, D.hip.pct] : [D.hip.pct];
+  return taxas.map(t => {
+    const serv = (D.ads ? Math.floor(D.ads.acoes * t) : 0) + (D.gbp ? Math.floor(D.gbp.acoes * t) : 0);
+    const fat = serv * D.hip.ticket;
+    return { t, serv, fat, m: fat / D.invest.cur };
+  });
+}
+
+function sugestoes(D) {
+  const S = [];
+  const c = canais(D);
+  S.push('Você: Anotar de onde veio cada serviço fechado (Google, indicação, cliente antigo). Um caderno ou planilha simples já resolve. | Como saber: no próximo relatório, a estimativa de retorno vira número real.');
+  if (ok(c.share)) {
+    if (c.share >= 0.5) S.push(`Você: Responder o WhatsApp o mais rápido possível, porque é por ele que chegam ${pctTxt(c.share)} dos contatos. | Como saber: junto com as anotações, vamos ver quantos contatos por WhatsApp viraram serviço.`);
+    else S.push(`Você: Manter o telefone sempre atendido, porque ${pctTxt(1 - c.share)} dos contatos chegam por ligação. | Como saber: junto com as anotações, vamos ver quantas ligações viraram serviço.`);
+  }
+  if (D.ads && D.ads.acoes) {
+    const cpa = D.ads.custo / D.ads.acoes;
+    const cpaP = ok(D.ads.prev.custo) && D.ads.prev.acoes ? D.ads.prev.custo / D.ads.prev.acoes : NaN;
+    if (ok(cpaP) && cpa > cpaP * 1.15) S.push(`Nós: Revisar as buscas que gastaram sem trazer contato, antes de mexer no investimento. | Como saber: o custo por contato deve voltar para perto de R$ ${cpaP.toFixed(2).replace('.', ',')}.`);
+    else S.push(`Nós: Manter os anúncios e o investimento como estão. Está funcionando, e mudar tudo agora atrapalharia a comparação. | Como saber: o custo por contato deve continuar perto de R$ ${cpa.toFixed(2).replace('.', ',')}.`);
+  } else if (D.gbp) {
+    S.push('Nós: Seguir com a manutenção do Perfil (fotos reais, posts e respostas às avaliações). | Como saber: acompanhar os contatos pelo Perfil no próximo mês.');
+  }
+  return S.slice(0, 3).join('\n');
+}
+
+/* ============================================================
+   5. Páginas
+   ============================================================ */
+function pagina(D, n, corpo, rodapeEsq) {
+  return `<section class="page">${corpo}<div class="foot"><span>${rodapeEsq || esc(D.cliente + ' · ' + D.periodo)}</span><span>${n}</span></div></section>`;
+}
+
+function colunas(itens, altura) {
+  const max = Math.max(...itens.map(i => i.v), 1);
+  return `<div class="cols" style="height:${altura || 40}mm">${itens.map((i, k) =>
+    `<div class="col"><div class="v">${int(i.v)}</div><div class="c${k === itens.length - 1 ? ' now' : ''}" style="height:${(i.v / max * 100).toFixed(1)}%"></div></div>`).join('')}</div>
+    <div class="colx">${itens.map(i => `<span>${esc(i.mes)}</span>`).join('')}</div>`;
+}
+
+function pgCapa(D) {
+  const ch = D.ads ? D.ads : D.gbp;
+  const fonte = D.ads ? 'pelos anúncios no Google' : 'pelo seu Perfil no Google';
+  const mes = D.mes.nome, ant = D.mesAnt;
+  const c = ch.acoes, p = ch.prev.acoes;
+  let h, sub = '';
+  if (!ok(p) || !p || !ant) {
+    h = `Em ${mes}, ${int(c)} pessoas entraram em contato com você.`;
+    sub = `<p>Elas chegaram ${fonte}.</p>`;
+  } else {
+    const rc = c / p;
+    const ri = ok(D.invest.prev) && D.invest.prev ? D.invest.cur / D.invest.prev : null;
+    if (rc >= 1.1 && ri !== null && Math.abs(ri - 1) <= 0.1) h = `Com o mesmo dinheiro de ${ant.toLowerCase()}, mais gente entrou em contato.`;
+    else if (rc >= 1.1) h = `${mes} trouxe mais contatos que ${ant.toLowerCase()}.`;
+    else if (rc > 0.9) h = `${mes} ficou parecido com ${ant.toLowerCase()}.`;
+    else h = `${mes} trouxe menos contatos que ${ant.toLowerCase()}. Vamos entender por quê.`;
+    sub = `<p>Vieram <b>${int(c)} contatos</b> ${fonte} em ${mes.toLowerCase()}. Em ${ant.toLowerCase()}, foram <b>${int(p)}</b>.</p>`;
+    if (ri !== null) {
+      const igual = Math.abs(ri - 1) <= 0.03 ? 'ficou praticamente igual' : ri > 1 ? 'subiu' : 'caiu';
+      sub += `<p>O investimento ${igual}: ${brl(D.invest.prev)} em ${ant.toLowerCase()}, ${brl(D.invest.cur)} em ${mes.toLowerCase()}.</p>`;
+    }
+    sub += colunas([{ mes: ant, v: p }, { mes, v: c }]) + `<p class="caption">Contatos que vieram ${fonte}</p>`;
+  }
+  const corpo = `<div class="tag">${esc(D.cliente)} · ${esc(D.periodo)}</div><h1>${h}</h1>${sub}`;
+  return pagina(D, 1, corpo, D.resp ? 'Preparado por ' + esc(D.resp) : esc(D.cliente)).replace(`<span>1</span>`, `<span>${esc(D.data)}</span>`);
+}
+
+function pgPergunta(D, n) {
+  if (!ok(D.hip.ticket) || !ok(D.invest.cur) || !D.invest.cur) return '';
+  const k = Math.max(1, Math.ceil(D.invest.cur / D.hip.ticket));
+  const stats = [];
+  if (D.ads) stats.push(`<div class="stat"><div class="n">${int(D.ads.acoes)}</div><div class="t">contatos pelos anúncios</div></div>`);
+  if (D.gbp) stats.push(`<div class="stat"><div class="n">${int(D.gbp.acoes)}</div><div class="t">contatos pelo seu Perfil no Google (Maps)</div></div>`);
+  const nota = D.ads && D.gbp ? `<div class="note">Não somamos os dois números de propósito. Uma mesma pessoa pode ter visto o anúncio e depois chamado pelo Perfil, e aí ela aparece nos dois lugares.</div>` : '';
+  return pagina(D, n, `<div class="tag">Uma pergunta antes</div>
+    <div class="q">Quantos serviços você precisa fechar no mês para pagar tudo o que investiu no Google?</div>
+    <div class="hero">${k}<small>${k === 1 ? 'serviço' : 'serviços'}</small></div>
+    <p>Todo o investimento do mês foi <b>${brl(D.invest.cur)}</b>. Com um serviço médio de <b>${brl0(D.hip.ticket)}</b>, ${k === 1 ? 'um serviço já cobre' : k + ' serviços já cobrem'} a conta.</p>
+    <div class="card"><p style="margin-top:0">Em ${D.mes.nome.toLowerCase()}, chegaram:</p><div class="stats${stats.length === 1 ? ' one' : ''}">${stats.join('')}</div></div>${nota}`);
+}
+
+function pgAds(D, n) {
+  const a = D.ads; if (!a) return '';
+  const temPrev = ok(a.prev.acoes);
+  const itens = [
+    ['WhatsApp direto', a.waDir, a.prev.waDir], ['Ligação direta', a.ligDir, a.prev.ligDir],
+    ['Ligação pelo perfil do anúncio', a.telPerf, a.prev.telPerf], ['WhatsApp pelo perfil do anúncio', a.waPerf, a.prev.waPerf],
+    ['Outras ações', a.outras, NaN]
+  ].filter(i => ok(i[1]) && (i[1] > 0 || (ok(i[2]) && i[2] > 0)));
+  const max = Math.max(...itens.flatMap(i => [i[1], ok(i[2]) ? i[2] : 0]), 1);
+  const w = v => (v / max * 100).toFixed(1) + '%';
+  const barras = itens.map(([l, c, p]) => `<div class="bar"><div class="lbl"><span>${l}</span><span>${temPrev && ok(p) ? `<span class="was">${int(p)} →</span> ` : ''}<b>${int(c)}</b></span></div>
+    <div class="pair">${temPrev && ok(p) ? `<div class="track"><div class="fill prev" style="width:${w(p)}"></div></div>` : ''}<div class="track"><div class="fill" style="width:${w(c)}"></div></div></div></div>`).join('');
+  const cpa = a.acoes ? a.custo / a.acoes : NaN;
+  const cpaP = ok(a.prev.custo) && a.prev.acoes ? a.prev.custo / a.prev.acoes : NaN;
+  let linha = `Cerca de <b>${porDia(a.acoes, D.mes.dias)}</b>.`;
+  if (ok(cpa)) linha += ` Cada contato custou <b>${brl(cpa)}</b> em anúncio.`;
+  if (ok(cpaP)) linha += ` Em ${D.mesAnt.toLowerCase()}, custava <b>${brl(cpaP)}</b>.`;
+  let insight = '';
+  if (temPrev) {
+    const d = itens.filter(i => ok(i[2])).map(i => ({ l: i[0], c: i[1], p: i[2], d: i[1] - i[2] }));
+    const sobe = d.filter(x => x.d > 0).sort((x, y) => y.d - x.d)[0];
+    const desce = d.filter(x => x.d < 0).sort((x, y) => x.d - y.d)[0];
+    const iguais = d.filter(x => x.d === 0 && x.c > 0).map(x => low(x.l));
+    if (sobe) insight = `<b>O que mais cresceu foi ${low(sobe.l)}</b>, de ${int(sobe.p)} para ${int(sobe.c)}.`;
+    else if (desce) insight = `<b>O que mais caiu foi ${low(desce.l)}</b>, de ${int(desce.p)} para ${int(desce.c)}.`;
+    if (iguais.length && sobe) insight += ` ${iguais.length === 1 ? cap(iguais[0]) + ' ficou igual' : 'Ficaram iguais: ' + iguais.join(', ')}.`;
+  } else if (itens.length) {
+    const top = [...itens].sort((x, y) => y[1] - x[1])[0];
+    insight = `<b>O que mais trouxe contato foi ${low(top[0])}</b> (${int(top[1])}).`;
+  }
+  const legenda = temPrev ? `<div class="legend"><span><i style="background:var(--prev)"></i>${esc(D.mesAnt)}</span><span><i style="background:var(--accent)"></i>${esc(D.mes.nome)}</span></div>` : '';
+  return pagina(D, n, `<div class="tag">Anúncios no Google</div><h2>${int(a.acoes)} pessoas pediram para falar com você.</h2>
+    <p>${linha}</p><div class="bars">${barras}</div>${legenda}${insight ? `<p>${insight}</p>` : ''}`);
+}
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const low = s => /^WhatsApp/.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1);
+
+function pgGbp(D, n) {
+  const g = D.gbp; if (!g) return '';
+  const temImp = ok(g.imp) && g.imp > 0;
+  const h = temImp ? `Seu perfil apareceu ${int(g.imp)} vezes. ${int(g.acoes)} pessoas chamaram.` : `${int(g.acoes)} pessoas chamaram pelo seu perfil.`;
+  const taxa = temImp && g.acoes ? `<p>De cada <b>100 pessoas</b> que viram seu perfil, cerca de <b>${Math.max(1, Math.round(g.acoes / g.imp * 100))}</b> entraram em contato.</p>` : '';
+  const st = [['WhatsApp', g.wa, g.prev.wa], ['ligações', g.ligar, g.prev.ligar], ['pedidos de rota', g.rotas, NaN], ['cliques no site', g.site, g.prev.site]]
+    .filter(s => ok(s[1]) && s[1] > 0).slice(0, 4)
+    .map(([t, v, p]) => `<div class="stat"><div class="n">${int(v)}</div><div class="t">${t}</div>${ok(p) && D.mesAnt ? `<div class="d">${D.mesAnt.toLowerCase()}: ${int(p)}</div>` : ''}</div>`).join('');
+  let evol = '';
+  if (g.evol.length >= 2) {
+    evol = `<p style="margin-top:5mm"><b>Os últimos ${g.evol.slice(-3).length} meses:</b></p>${colunas(g.evol.slice(-3), 30)}<p>${tendencia(g.evol)}</p>`;
+  }
+  return pagina(D, n, `<div class="tag">Seu Perfil no Google (Maps)</div><h2>${h}</h2>${taxa}<div class="stats">${st}</div>${evol}`);
+}
+
+function pgCanais(D, n) {
+  const c = canais(D); if (!c.total) return '';
+  const s = c.share, wa = s >= 0.5;
+  const pd = wa ? s : 1 - s;
+  const nome = wa ? 'WhatsApp' : 'ligação';
+  let h;
+  if (Math.abs(s - 0.5) < 0.02) h = 'Metade chama pelo WhatsApp, metade liga.';
+  else if (pd >= 0.6) h = wa ? 'A maioria chama pelo WhatsApp.' : 'A maioria prefere ligar.';
+  else h = wa ? 'Pouco mais da metade chama pelo WhatsApp.' : 'Pouco mais da metade prefere ligar.';
+  const origem = D.ads && D.gbp ? 'Somando anúncios e perfil, foram' : 'Foram';
+  let antes = '';
+  if (ok(c.shareP) && D.mesAnt) {
+    const sp = c.shareP;
+    if ((sp >= 0.5) !== wa && Math.abs(s - 0.5) >= 0.02) antes = `<p>Em ${D.mesAnt.toLowerCase()}, era o contrário: o ${wa ? 'WhatsApp' : 'telefone'} era a minoria (${int(wa ? c.waP : c.totalP - c.waP)} de ${int(c.totalP)} contatos). Em ${D.mes.nome.toLowerCase()}, passou na frente.</p>`;
+    else antes = `<p>Em ${D.mesAnt.toLowerCase()}, era ${pctTxt(wa ? sp : 1 - sp)}.</p>`;
+  }
+  const significa = wa
+    ? '<b>O que isso quer dizer para você:</b> quem manda mensagem quer resposta rápida. Uma mensagem sem resposta por alguns minutos pode virar um cliente que chamou o concorrente.'
+    : '<b>O que isso quer dizer para você:</b> o telefone é a porta de entrada. Ligação não atendida costuma ser cliente perdido.';
+  return pagina(D, n, `<div class="tag">Onde as pessoas chamam</div><h2>${h}</h2>
+    <p>${origem} <b>${int(c.wa)} contatos por WhatsApp</b> e <b>${int(c.lig)} por ligação</b>.</p>
+    <div class="hero" style="font-size:52pt">${pctTxt(pd)}<small>dos contatos chegaram por ${nome}</small></div>${antes}<p>${significa}</p>`);
+}
+
+function pgBuscas(D, n) {
+  if (!D.ads || !D.ads.palavras.length) return '';
+  const rows = D.ads.palavras.slice(0, 5);
+  const custos = rows.map(r => num(r[2])).filter(ok);
+  const faixa = custos.length ? (Math.min(...custos) === Math.max(...custos) ? `Cada contato custou <b>${brl(custos[0])}</b>.` : `Nelas, cada contato custou <b>entre ${brl(Math.min(...custos))} e ${brl(Math.max(...custos))}</b>.`) : '';
+  return pagina(D, n, `<div class="tag">O que as pessoas digitaram</div><h2>As buscas que mais trouxeram contato</h2>
+    <p>Cada pessoa chama o serviço de um jeito. Os anúncios aparecem para todas essas formas.</p>
+    <div class="terms">${rows.map(r => `<div class="term"><div class="t">“${esc(r[0])}”</div><span><b>${esc(r[1])}</b> contatos</span></div>`).join('')}</div><p>${faixa}</p>`);
+}
+
+function pgRetorno(D, n) {
+  const C = cenarios(D); if (!C) return '';
+  const baixo = C[0], alto = C[C.length - 1];
+  let h;
+  if (baixo.m >= 1) h = C.length > 1 ? 'Mesmo na conta cautelosa, o investimento se paga.' : 'Pela estimativa, o investimento se paga.';
+  else if (alto.m >= 1) h = 'Na conta cautelosa ainda não se paga. Na otimista, sim.';
+  else h = 'Por enquanto, o retorno estimado não cobre o investimento.';
+  const umEm = t => { const k = Math.round(t * 10); return `<b>${k} em cada 10</b> contatos ${k === 1 ? 'fechou' : 'fecharam'}`; };
+  const cards = C.map(c => `<div class="stat"><div class="t">Se ${umEm(c.t)}</div><div class="n">≈ ${brl0(c.fat)}</div><div class="d">${int(c.serv)} ${c.serv === 1 ? 'serviço' : 'serviços'} · ${vezes(c.m)}</div></div>`).join('');
+  const dupla = D.ads && D.gbp ? ' Se uma pessoa foi contada no anúncio e no perfil, o número real fica um pouco menor.' : '';
+  return pagina(D, n, `<div class="tag">Quanto isso pode ter virado (estimativa)</div><h2>${h}</h2>
+    <p>Ainda não sabemos quantos contatos viraram serviço. Por isso, fizemos a conta ${C.length > 1 ? 'em dois cenários' : 'num cenário'}, com serviço médio de <b>${brl0(D.hip.ticket)}</b>:</p>
+    <div class="stats one">${cards}</div>
+    <div class="note">São estimativas, não vendas confirmadas.${dupla} Com os seus registros de serviços fechados, trocamos a estimativa por número de verdade.</div>`);
+}
+
+function pgFizemos(D, n, texto) {
+  const itens = texto.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  if (!itens.length) return '';
+  return pagina(D, n, `<div class="tag">O que fizemos em ${esc(D.mes.nome.toLowerCase())}</div><h2>O trabalho do mês</h2>
+    <ul class="done">${itens.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`);
+}
+
+function pgPassos(D, n, texto) {
+  const linhas = texto.split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 3);
+  if (!linhas.length) return '';
+  const li = linhas.map(l => {
+    let [acao, como] = l.split('|').map(s => s.trim());
+    let quem = '';
+    const m = acao.match(/^(Você|Voce|Nós|Nos|Cliente|Agência|Agencia)\s*:\s*/i);
+    if (m) { quem = /^n|^ag/i.test(m[1]) ? 'Nós' : 'Você'; acao = acao.slice(m[0].length); }
+    como = como ? como.replace(/^como saber\s*:\s*/i, '') : '';
+    const [frase, ...resto] = acao.split(/(?<=\.)\s+/);
+    return `<li>${quem ? `<span class="who">${quem}</span>` : ''}<span class="what">${esc(frase)}</span>${resto.length ? ' ' + esc(resto.join(' ')) : ''}${como ? `<span class="how">Como saber: ${esc(como)}</span>` : ''}</li>`;
+  }).join('');
+  const prox = MESES[(MESES.indexOf(D.mes.nome.toLowerCase()) + 1) % 12] || 'o próximo mês';
+  return pagina(D, n, `<div class="tag">O que vamos fazer em ${prox}</div><h2>${linhas.length === 1 ? 'Um passo' : linhas.length === 2 ? 'Dois passos' : 'Três passos'} pequenos</h2><ol class="acts">${li}</ol>`);
+}
+
+function pgTabela(D, n) {
+  const ant = D.mesAnt ? esc(D.mesAnt) : '—';
+  const v = (x, f) => ok(x) ? (f ? f(x) : int(x)) : '—';
+  const L = [];
+  const sec = t => L.push(`<tr class="sec"><td colspan="3">${t}</td></tr>`);
+  const row = (t, p, c, f) => L.push(`<tr><td>${t}</td><td>${v(p, f)}</td><td>${v(c, f)}</td></tr>`);
+  sec('Investimento');
+  if (D.ads) row('Anúncios no Google', D.ads.prev.custo, D.ads.custo, brl);
+  row('Total', D.invest.prev, D.invest.cur, brl);
+  if (D.ads) {
+    const a = D.ads; sec('Anúncios');
+    row('Contatos (total)', a.prev.acoes, a.acoes);
+    row('WhatsApp direto', a.prev.waDir, a.waDir); row('Ligação direta', a.prev.ligDir, a.ligDir);
+    row('Ligação pelo perfil', a.prev.telPerf, a.telPerf); row('WhatsApp pelo perfil', a.prev.waPerf, a.waPerf);
+    row('Custo por contato', ok(a.prev.custo) && a.prev.acoes ? a.prev.custo / a.prev.acoes : NaN, a.acoes ? a.custo / a.acoes : NaN, brl);
+    if (ok(a.rotas)) row('Pedidos de rota', NaN, a.rotas);
+  }
+  if (D.gbp) {
+    const g = D.gbp; sec('Perfil no Google');
+    if (ok(g.imp)) row('Vezes que apareceu', NaN, g.imp);
+    row('Contatos (total)', g.prev.acoes, g.acoes);
+    row('WhatsApp', g.prev.wa, g.wa); row('Ligações', g.prev.ligar, g.ligar); row('Cliques no site', g.prev.site, g.site);
+    if (ok(g.rotas)) row('Pedidos de rota', NaN, g.rotas);
+  }
+  return pagina(D, n, `<div class="tag">Para quem gosta de detalhe</div><h2 style="font-size:15pt">Todos os números do mês</h2>
+    <table><tr><th>Indicador</th><th>${ant}</th><th>${esc(D.mes.nome)}</th></tr>${L.join('')}</table>`, '— = dado não recebido');
+}
+
+function render(D, fizemos, passos) {
+  const fab = [
+    () => pgCapa(D), n => pgPergunta(D, n), n => pgAds(D, n), n => pgGbp(D, n), n => pgCanais(D, n),
+    n => pgBuscas(D, n), n => pgRetorno(D, n), n => pgFizemos(D, n, fizemos), n => pgPassos(D, n, passos), n => pgTabela(D, n)
+  ];
+  let n = 0;
+  return fab.map(f => { const html = f(n + 1); if (html) n++; return html; }).join('');
+}
+
+/* ============================================================
+   6. Tela
+   ============================================================ */
+const $ = id => document.getElementById(id);
+let modelo = null;
+
+function mostrarAlertas(D) {
+  const extra = [];
+  if (!$('fizemos').value.trim()) extra.push(['warn', 'A página "O que fizemos no mês" está vazia e fica fora do relatório. Preencha abaixo.']);
+  const todos = [...D.alertas, ...extra];
+  $('alertas').innerHTML = todos.map(([t, m]) => `<div class="alert ${t === 'err' ? 'err' : t === 'info' ? 'ok' : ''}">${esc(m)}</div>`).join('');
+}
+
+function ajustarZoom() {
+  const largura = document.querySelector('.page')?.getBoundingClientRect().width / (parseFloat(document.querySelector('.page')?.style.zoom) || 1);
+  if (!largura) return;
+  const z = Math.min(1, (window.innerWidth - 32) / largura);
+  document.querySelectorAll('.page').forEach(p => p.style.zoom = z);
+}
+
+function atualizar() {
+  if (!modelo) return;
+  $('preview').innerHTML = render(modelo, $('fizemos').value, $('passos').value);
+  $('previewTitle').hidden = false;
+  mostrarAlertas(modelo);
+  ajustarZoom();
+}
+
+function gerar() {
+  try {
+    const P = lerEntrada($('entrada').value);
+    if (!Object.keys(P).length) throw new Error('Não reconheci nenhum campo. Cole a tabela com os campos __ASSIM__ ou um JSON.');
+    modelo = montarModelo(P);
+    if (!modelo.ads && !modelo.gbp) { mostrarAlertas(modelo); $('preview').innerHTML = ''; return; }
+    $('fizemos').value = modelo.fizemos || $('fizemos').value;
+    $('passos').value = sugestoes(modelo);
+    $('extras').hidden = false;
+    document.title = `${modelo.cliente} · ${modelo.periodo}`;
+    atualizar();
+  } catch (e) {
+    $('alertas').innerHTML = `<div class="alert err">${esc(e.message)}</div>`;
+  }
+}
+
+const EXEMPLO = [
+  ['__CLIENTE__', 'Auto Socorro Exemplo'],
+  ['__PERIODO__', 'Outubro/2026'],
+  ['__RESPONSAVEL__', 'Equipe da agência'],
+  ['__DATA_GERACAO__', '05/11/2026'],
+  ['__ADS_ACOES__', '58'],
+  ['__GBP_ACOES__', '41'],
+  ['__ESTIMATIVA_HIPOTESE__', 'A estimativa considera que 30% das ações de contato viram serviço fechado (resultado arredondado para baixo) e um ticket médio de R$ 280,00 por serviço. São valores estimados, não vendas confirmadas.'],
+  ['__ADS_LIGACOES_DIRETAS__', '20'],
+  ['__ADS_WHATSAPP_DIRETO__', '26'],
+  ['__ADS_TELEFONE_PERFIL__', '9'],
+  ['__ADS_WHATSAPP_PERFIL__', '3'],
+  ['__ADS_OUTRAS_ACOES__', '0'],
+  ['__ADS_PEDIDOS_ROTA__', '15'],
+  ['__GBP_CLIQUES_LIGAR__', '18'],
+  ['__GBP_CLIQUES_WHATSAPP__', '20'],
+  ['__GBP_PEDIDOS_ROTA__', '12'],
+  ['__GBP_CLIQUES_SITE__', '3'],
+  ['__COMPARATIVO_TABELA__', '<table><tr><th>Indicador</th><th>Setembro/2026</th><th>Outubro/2026</th></tr><tr><td>Investimento total</td><td>R$ 418,00</td><td>R$ 420,00</td></tr><tr><td>Ações dos anúncios</td><td>51</td><td>58</td></tr><tr><td>Ligações diretas (anúncio)</td><td>22</td><td>20</td></tr><tr><td>WhatsApp direto (anúncio)</td><td>18</td><td>26</td></tr><tr><td>Telefone pelo perfil (anúncio)</td><td>9</td><td>9</td></tr><tr><td>WhatsApp pelo perfil (anúncio)</td><td>2</td><td>3</td></tr><tr><td>Ações do Perfil no Google</td><td>44</td><td>41</td></tr><tr><td>Cliques para ligar (Perfil)</td><td>21</td><td>18</td></tr><tr><td>Cliques no WhatsApp (Perfil)</td><td>19</td><td>20</td></tr><tr><td>Cliques no site (Perfil)</td><td>4</td><td>3</td></tr></table>'],
+  ['__ATIVIDADES_MES__', ''],
+  ['__INVESTIMENTO_TOTAL__', 'R$ 420,00'],
+  ['__ADS_CUSTO__', 'R$ 345,00'],
+  ['__ADS_CONV__', '58'],
+  ['__ADS_EVOLUCAO_HTML__', '<table><tr><th>Mês</th><th>Investimento</th><th>Serviços (est.)</th></tr><tr><td>Setembro/2026</td><td>R$ 343,00</td><td>15</td></tr><tr><td>Outubro/2026</td><td>R$ 345,00</td><td>17</td></tr></table>'],
+  ['__ADS_CAMPANHAS_TABELA__', '<table><tr><th>Campanha</th><th>Custo</th><th>Contatos</th><th>Recomendação</th></tr><tr><td>Guincho 24h</td><td>R$ 190,00</td><td>32</td><td>Manter</td></tr><tr><td>Reboque Ligação</td><td>R$ 155,00</td><td>26</td><td>Manter</td></tr></table>'],
+  ['__ADS_TOP_PALAVRAS_TABELA__', '<table><tr><th>Termo</th><th>Contatos</th><th>Custo por contato</th></tr><tr><td>guincho 24 horas</td><td>14</td><td>R$ 4,10</td></tr><tr><td>reboque perto de mim</td><td>10</td><td>R$ 3,80</td></tr><tr><td>auto socorro</td><td>8</td><td>R$ 4,60</td></tr></table>'],
+  ['__GBP_INTERACOES__', '41'],
+  ['__GBP_IMPRESSOES__', '950'],
+  ['__GBP_EVOLUCAO_HTML__', '<table><tr><th>Mês</th><th>Interações</th><th>ROAS</th></tr><tr><td>Agosto/2026</td><td>38</td><td>-</td></tr><tr><td>Setembro/2026</td><td>44</td><td>-</td></tr><tr><td>Outubro/2026</td><td>41</td><td>-</td></tr></table>']
+].map(([k, v]) => k + '\t' + v).join('\n');
+
+$('btnGerar').onclick = gerar;
+$('btnExemplo').onclick = () => { $('entrada').value = EXEMPLO; $('fizemos').value = ''; gerar(); };
+$('btnAtualizar').onclick = atualizar;
+$('btnPdf').onclick = () => { atualizar(); window.print(); };
+$('fizemos').oninput = () => modelo && mostrarAlertas(modelo);
+window.addEventListener('resize', ajustarZoom);
+window.addEventListener('beforeprint', () => document.querySelectorAll('.page').forEach(p => p.style.zoom = 1));
+window.addEventListener('afterprint', ajustarZoom);
+</script>
+</body>
+</html>
