@@ -25,6 +25,10 @@
   .ui label small { font-weight: 400; color: var(--muted); }
   .ui textarea { width: 100%; min-height: 120px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; font: 13px/1.4 ui-monospace, Menlo, monospace; background: #fff; color: var(--ink); resize: vertical; }
   .ui textarea.prose { font: 14px/1.45 Inter, system-ui, sans-serif; min-height: 96px; }
+  .ui input[type=number] { width: 120px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font: 14px Inter, system-ui, sans-serif; background: #fff; color: var(--ink); }
+  .ui h3 { font-size: 14px; margin: 22px 0 0; }
+  .logo-box { display: flex; align-items: center; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+  .logo-box img { max-height: 48px; max-width: 160px; object-fit: contain; border: 1px dashed var(--line); border-radius: 8px; padding: 4px; background: repeating-conic-gradient(#eee 0 25%, #fff 0 50%) 0 0 / 12px 12px; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   button { font: 600 14px Inter, system-ui, sans-serif; border-radius: 10px; padding: 11px 16px; border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -82,6 +86,9 @@
   ol.acts, ul.done { list-style: none; margin-top: 3mm; display: flex; flex-direction: column; gap: 3mm; }
   ol.acts li, ul.done li { background: var(--soft); border-radius: 3mm; padding: 3mm 3.5mm; font-size: 10pt; line-height: 1.4; color: var(--ink-2); }
   ul.done li b { color: var(--ink); }
+  .canal { font-size: 7.5pt; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-top: 4mm; }
+  .canal + ul.done { margin-top: 1.5mm; }
+  .logo { display: block; max-height: 13mm; max-width: 45mm; object-fit: contain; object-position: left center; margin-bottom: 4mm; }
   ol.acts .who { font-size: 7.5pt; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); display: block; }
   ol.acts .what { color: var(--ink); font-weight: 600; }
   ol.acts .how { display: block; font-size: 8.5pt; color: var(--muted); margin-top: 1mm; }
@@ -122,8 +129,26 @@
   <div class="alerts" id="alertas"></div>
 
   <div id="extras" hidden>
-    <label for="fizemos">O que fizemos no mês <small>(uma ação por linha, em linguagem de cliente)</small></label>
-    <textarea id="fizemos" class="prose" placeholder="Cadastramos o serviço &quot;auto socorro&quot; no seu Perfil.&#10;Tiramos dos anúncios as buscas que gastavam sem trazer contato."></textarea>
+    <h3>Logo do cliente <small style="font-weight:400;color:var(--muted)">(opcional)</small></h3>
+    <div class="logo-box">
+      <input type="file" id="logoArq" accept="image/png,image/svg+xml,image/webp,image/jpeg">
+      <img id="logoPrev" alt="" hidden>
+      <button id="btnTirarLogo" type="button" hidden>Remover logo</button>
+    </div>
+    <p class="hint">Aparece pequena no topo da capa. Prefira PNG com fundo transparente. A logo fica guardada só neste navegador e volta sozinha da próxima vez que você gerar o relatório deste cliente.</p>
+    <h3>O que fizemos no mês</h3>
+    <p class="hint">Copie o histórico de atividades do seu sistema e cole no canal certo, uma ação por linha. Canal vazio não aparece no relatório.</p>
+    <label for="fzGbp">Perfil no Google (GBP)</label>
+    <textarea id="fzGbp" class="prose" placeholder="Cadastramos o serviço &quot;auto socorro&quot; no seu Perfil.&#10;Publicamos 4 fotos reais da equipe."></textarea>
+    <label for="fzAds">Anúncios no Google (Ads)</label>
+    <textarea id="fzAds" class="prose" placeholder="Tiramos dos anúncios as buscas que gastavam sem trazer contato."></textarea>
+    <label for="fzSite">Site</label>
+    <textarea id="fzSite" class="prose" placeholder="Criamos a página do serviço de reboque de moto."></textarea>
+    <h3>Pedidos de rota</h3>
+    <label style="font-weight:400;display:flex;gap:8px;align-items:flex-start;margin-top:8px"><input type="checkbox" id="rotas" style="margin-top:3px"> <span>Contar pedidos de rota do Perfil como resultado <small style="color:var(--muted)">(marque só para clientes em que a visita à loja importa; desmarcado, as rotas aparecem só na tabela final)</small></span></label>
+    <label for="avaliacoes">Avaliações no Perfil do Google <small>(total hoje; deixe vazio se não souber)</small></label>
+    <input type="number" id="avaliacoes" min="0" step="1">
+    <p class="hint">Com menos de 10 avaliações, o relatório ganha uma página sobre isso e um passo para o cliente pedir avaliações.</p>
     <label for="passos">Próximos passos <small>(até 3; formato: Você/Nós: ação | Como saber: ...)</small></label>
     <textarea id="passos" class="prose"></textarea>
     <p class="hint">Os próximos passos vêm pré-preenchidos com sugestões calculadas a partir dos números. Revise antes de enviar.</p>
@@ -241,10 +266,11 @@ function montarModelo(P) {
       site: num(P.__GBP_CLIQUES_SITE__ ?? P.__GBP_CLIQUES__), rotas: num(P.__GBP_PEDIDOS_ROTA__ ?? P.__GBP_ROTAS__),
       prev: {
         acoes: ant('Ações do Perfil no Google'), ligar: ant('Cliques para ligar (Perfil)'),
-        wa: ant('Cliques no WhatsApp (Perfil)'), site: ant('Cliques no site (Perfil)')
+        wa: ant('Cliques no WhatsApp (Perfil)'), site: ant('Cliques no site (Perfil)'), rotas: ant('Pedidos de rota (Perfil)')
       },
-      evol
+      evol, bruto: { acoes: ok(gbpAcoes) ? gbpAcoes : 0, prev: NaN, evol }
     };
+    D.gbp.bruto.prev = D.gbp.prev.acoes;
   }
 
   // Hipótese de fechamento
@@ -253,7 +279,7 @@ function montarModelo(P) {
   const mt = hip.match(/ticket[^R]*R\$\s*([\d.,]+)/i);
   D.hip = { pct: mp ? num(mp[1]) / 100 : NaN, ticket: mt ? num(mt[1]) : NaN };
 
-  D.fizemos = (P.__ATIVIDADES_MES__ || '').trim();
+  D.aval = num(P.__GBP_AVALIACOES__ ?? P.__GBP_TOTAL_AVALIACOES__);
   validar(D);
   return D;
 }
@@ -261,6 +287,21 @@ function montarModelo(P) {
 /* ============================================================
    3. Conferências (aparecem só no painel, não no PDF)
    ============================================================ */
+// Rotas são infladas pelo próprio Google e só contam como resultado quando a caixa está marcada.
+function aplicarRotas(D, contar) {
+  const g = D.gbp; if (!g) return;
+  D.contarRotas = contar;
+  const semRota = (l, w, s) => [l, w, s].some(ok) ? [l, w, s].filter(ok).reduce((x, y) => x + y, 0) : NaN;
+  // O total do app às vezes já vem sem rotas, às vezes com: por isso o total é refeito a partir das partes.
+  const comRota = (base, r) => ok(base) && ok(r) ? base + r : NaN;
+  let cur = semRota(g.ligar, g.wa, g.site), prev = semRota(g.prev.ligar, g.prev.wa, g.prev.site);
+  if (contar) { cur = comRota(cur, g.rotas); prev = comRota(prev, g.prev.rotas); }
+  if (ok(cur) && cur === g.bruto.acoes && (!ok(prev) || prev === g.bruto.prev)) { g.acoes = cur; g.prev.acoes = g.bruto.prev; g.evol = g.bruto.evol; return; }
+  g.acoes = ok(cur) ? cur : g.bruto.acoes;
+  g.prev.acoes = ok(cur) ? prev : g.bruto.prev;
+  g.evol = ok(cur) && ok(prev) && D.mesAnt ? [{ mes: D.mesAnt, v: prev }, { mes: D.mes.nome, v: cur }] : [];
+}
+
 function validar(D) {
   const A = D.alertas;
   if (!D.ads && !D.gbp) A.push(['err', 'Não encontrei dados de Ads nem de GBP. Confira se colou a tabela inteira.']);
@@ -279,7 +320,8 @@ function validar(D) {
   if (D.gbp) {
     const g = D.gbp;
     const soma = [g.ligar, g.wa, g.site].filter(ok).reduce((x, y) => x + y, 0);
-    if (soma && soma !== g.acoes) A.push(['warn', `GBP: ligar + WhatsApp + site somam ${soma}, mas o total é ${g.acoes}.`]);
+    const somaR = soma + (ok(g.rotas) ? g.rotas : 0);
+    if (soma && soma !== g.acoes && somaR !== g.acoes) A.push(['warn', `GBP: ligar + WhatsApp + site somam ${soma} (${somaR} com rotas), mas o total é ${g.acoes}.`]);
   }
   if (D.ads && D.gbp) A.push(['info', 'Ads e GBP são mostrados separados, sem somar, porque a mesma pessoa pode aparecer nos dois.']);
 }
@@ -340,20 +382,26 @@ function cenarios(D) {
   });
 }
 
+const avalBaixa = D => ok(D.aval) && D.aval < 10;
+
 function sugestoes(D) {
   const S = [];
   const c = canais(D);
   S.push('Você: Anotar de onde veio cada serviço fechado (Google, indicação, cliente antigo). Um caderno ou planilha simples já resolve. | Como saber: no próximo relatório, a estimativa de retorno vira número real.');
+  if (avalBaixa(D)) S.push(`Você: Pedir avaliação no Google aos clientes satisfeitos, logo depois da entrega ou do serviço. Hoje o perfil tem só ${int(D.aval)} ${D.aval === 1 ? 'avaliação' : 'avaliações'}. | Como saber: no próximo relatório, contamos quantas avaliações novas chegaram.`);
+  const passoCanal = [];
   if (ok(c.share)) {
-    if (c.share >= 0.5) S.push(`Você: Responder o WhatsApp o mais rápido possível, porque é por ele que chegam ${pctTxt(c.share)} dos contatos. | Como saber: junto com as anotações, vamos ver quantos contatos por WhatsApp viraram serviço.`);
-    else S.push(`Você: Manter o telefone sempre atendido, porque ${pctTxt(1 - c.share)} dos contatos chegam por ligação. | Como saber: junto com as anotações, vamos ver quantas ligações viraram serviço.`);
+    if (c.share >= 0.5) passoCanal.push(`Você: Responder o WhatsApp o mais rápido possível, porque é por ele que chegam ${pctTxt(c.share)} dos contatos. | Como saber: junto com as anotações, vamos ver quantos contatos por WhatsApp viraram serviço.`);
+    else passoCanal.push(`Você: Manter o telefone sempre atendido, porque ${pctTxt(1 - c.share)} dos contatos chegam por ligação. | Como saber: junto com as anotações, vamos ver quantas ligações viraram serviço.`);
   }
   if (D.ads && D.ads.acoes) {
     const cpa = D.ads.custo / D.ads.acoes;
     const cpaP = ok(D.ads.prev.custo) && D.ads.prev.acoes ? D.ads.prev.custo / D.ads.prev.acoes : NaN;
     if (ok(cpaP) && cpa > cpaP * 1.15) S.push(`Nós: Revisar as buscas que gastaram sem trazer contato, antes de mexer no investimento. | Como saber: o custo por contato deve voltar para perto de R$ ${cpaP.toFixed(2).replace('.', ',')}.`);
     else S.push(`Nós: Manter os anúncios e o investimento como estão. Está funcionando, e mudar tudo agora atrapalharia a comparação. | Como saber: o custo por contato deve continuar perto de R$ ${cpa.toFixed(2).replace('.', ',')}.`);
-  } else if (D.gbp) {
+  }
+  S.push(...passoCanal);
+  if (D.gbp && !(D.ads && D.ads.acoes)) {
     S.push('Nós: Seguir com a manutenção do Perfil (fotos reais, posts e respostas às avaliações). | Como saber: acompanhar os contatos pelo Perfil no próximo mês.');
   }
   return S.slice(0, 3).join('\n');
@@ -373,6 +421,28 @@ function colunas(itens, altura) {
     <div class="colx">${itens.map(i => `<span>${esc(i.mes)}</span>`).join('')}</div>`;
 }
 
+// O tipo de contato que mais cresceu no canal da capa (ligações, WhatsApp, site, rotas), para a manchete não falar só do que caiu.
+function destaqueAlta(D) {
+  const soma = (...v) => v.some(ok) ? v.filter(ok).reduce((x, y) => x + y, 0) : NaN;
+  let tipos;
+  if (D.ads) {
+    const a = D.ads;
+    tipos = [['lig', soma(a.ligDir, a.telPerf), soma(a.prev.ligDir, a.prev.telPerf)], ['wa', soma(a.waDir, a.waPerf), soma(a.prev.waDir, a.prev.waPerf)]];
+  } else if (D.gbp) {
+    const g = D.gbp;
+    tipos = [['lig', g.ligar, g.prev.ligar], ['wa', g.wa, g.prev.wa], ['site', g.site, g.prev.site]];
+    if (D.contarRotas) tipos.push(['rota', g.rotas, g.prev.rotas]);
+  } else return null;
+  const TXT = {
+    lig: { frase: 'o telefone tocou mais', sujeito: 'As ligações', verbo: 'subiram' },
+    wa: { frase: 'o WhatsApp recebeu mais mensagens', sujeito: 'As mensagens no WhatsApp', verbo: 'subiram' },
+    site: { frase: 'mais gente abriu o site', sujeito: 'Os cliques no site', verbo: 'subiram' },
+    rota: { frase: 'mais gente pediu o caminho até a loja', sujeito: 'Os pedidos de rota', verbo: 'subiram' }
+  };
+  const best = tipos.filter(([, c, p]) => ok(c) && ok(p) && c - p >= 2).sort((x, y) => (y[1] - y[2]) - (x[1] - x[2]))[0];
+  return best ? { ...TXT[best[0]], c: best[1], p: best[2] } : null;
+}
+
 function pgCapa(D) {
   const ch = D.ads ? D.ads : D.gbp;
   const fonte = D.ads ? 'pelos anúncios no Google' : 'pelo seu Perfil no Google';
@@ -383,20 +453,26 @@ function pgCapa(D) {
     h = `Em ${mes}, ${int(c)} pessoas entraram em contato com você.`;
     sub = `<p>Elas chegaram ${fonte}.</p>`;
   } else {
-    const rc = c / p;
     const ri = ok(D.invest.prev) && D.invest.prev ? D.invest.cur / D.invest.prev : null;
-    if (rc >= 1.1 && ri !== null && Math.abs(ri - 1) <= 0.1) h = `Com o mesmo dinheiro de ${ant.toLowerCase()}, mais gente entrou em contato.`;
-    else if (rc >= 1.1) h = `${mes} trouxe mais contatos que ${ant.toLowerCase()}.`;
-    else if (rc > 0.9) h = `${mes} ficou parecido com ${ant.toLowerCase()}.`;
-    else h = `${mes} trouxe menos contatos que ${ant.toLowerCase()}. Vamos entender por quê.`;
-    sub = `<p>Vieram <b>${int(c)} contatos</b> ${fonte} em ${mes.toLowerCase()}. Em ${ant.toLowerCase()}, foram <b>${int(p)}</b>.</p>`;
+    const antL = ant.toLowerCase();
+    // Com números pequenos, alguns contatos a mais ou a menos é variação normal, não subida nem queda.
+    const margem = Math.max(Math.sqrt(p), p * 0.1);
+    const perto = Math.abs(c - p) <= margem;
+    const alta = destaqueAlta(D);
+    if (perto) h = alta ? `${mes} ficou perto de ${antL}, e ${alta.frase}.` : `${mes} ficou parecido com ${antL}.`;
+    else if (c > p && ri !== null && Math.abs(ri - 1) <= 0.1) h = `Com o mesmo dinheiro de ${antL}, mais gente entrou em contato.`;
+    else if (c > p) h = `${mes} trouxe mais contatos que ${antL}.`;
+    else h = alta ? `${mes} trouxe menos contatos que ${antL}, mas ${alta.frase}.` : `${mes} trouxe menos contatos que ${antL}.`;
+    sub = `<p>Vieram <b>${int(c)} contatos</b> ${fonte} em ${mes.toLowerCase()}. Em ${antL}, foram <b>${int(p)}</b>.</p>`;
+    if (alta && c <= p + margem) sub += `<p>${alta.sujeito} ${alta.verbo} de <b>${int(alta.p)}</b> para <b>${int(alta.c)}</b>.</p>`;
     if (ri !== null) {
       const igual = Math.abs(ri - 1) <= 0.03 ? 'ficou praticamente igual' : ri > 1 ? 'subiu' : 'caiu';
       sub += `<p>O investimento ${igual}: ${brl(D.invest.prev)} em ${ant.toLowerCase()}, ${brl(D.invest.cur)} em ${mes.toLowerCase()}.</p>`;
     }
     sub += colunas([{ mes: ant, v: p }, { mes, v: c }]) + `<p class="caption">Contatos que vieram ${fonte}</p>`;
   }
-  const corpo = `<div class="tag">${esc(D.cliente)} · ${esc(D.periodo)}</div><h1>${h}</h1>${sub}`;
+  const logo = D.logo ? `<img class="logo" src="${D.logo}" alt="${esc(D.cliente)}">` : '';
+  const corpo = `${logo}<div class="tag">${esc(D.cliente)} · ${esc(D.periodo)}</div><h1>${h}</h1>${sub}`;
   return pagina(D, 1, corpo, D.resp ? 'Preparado por ' + esc(D.resp) : esc(D.cliente)).replace(`<span>1</span>`, `<span>${esc(D.data)}</span>`);
 }
 
@@ -456,8 +532,8 @@ function pgGbp(D, n) {
   const temImp = ok(g.imp) && g.imp > 0;
   const h = temImp ? `Seu perfil apareceu ${int(g.imp)} vezes. ${int(g.acoes)} pessoas chamaram.` : `${int(g.acoes)} pessoas chamaram pelo seu perfil.`;
   const taxa = temImp && g.acoes ? `<p>De cada <b>100 pessoas</b> que viram seu perfil, cerca de <b>${Math.max(1, Math.round(g.acoes / g.imp * 100))}</b> entraram em contato.</p>` : '';
-  const st = [['WhatsApp', g.wa, g.prev.wa], ['ligações', g.ligar, g.prev.ligar], ['pedidos de rota', g.rotas, NaN], ['cliques no site', g.site, g.prev.site]]
-    .filter(s => ok(s[1]) && s[1] > 0).slice(0, 4)
+  const st = [['WhatsApp', g.wa, g.prev.wa], ['ligações', g.ligar, g.prev.ligar], ['pedidos de rota', g.rotas, g.prev.rotas], ['cliques no site', g.site, g.prev.site]]
+    .filter(s => (D.contarRotas || s[0] !== 'pedidos de rota') && ok(s[1]) && s[1] > 0).slice(0, 4)
     .map(([t, v, p]) => `<div class="stat"><div class="n">${int(v)}</div><div class="t">${t}</div>${ok(p) && D.mesAnt ? `<div class="d">${D.mesAnt.toLowerCase()}: ${int(p)}</div>` : ''}</div>`).join('');
   let evol = '';
   if (g.evol.length >= 2) {
@@ -516,11 +592,24 @@ function pgRetorno(D, n) {
     <div class="note">São estimativas, não vendas confirmadas.${dupla} Com os seus registros de serviços fechados, trocamos a estimativa por número de verdade.</div>`);
 }
 
-function pgFizemos(D, n, texto) {
-  const itens = texto.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-  if (!itens.length) return '';
+const linhas = t => String(t || '').split(/\r?\n/).map(s => s.replace(/^\s*[-•*–·]\s*/, '').trim()).filter(Boolean);
+
+function pgFizemos(D, n, F) {
+  const blocos = [['Perfil no Google', F.gbp], ['Anúncios no Google', F.ads], ['Site', F.site]]
+    .map(([nome, t]) => [nome, linhas(t)]).filter(b => b[1].length);
+  if (!blocos.length) return '';
   return pagina(D, n, `<div class="tag">O que fizemos em ${esc(D.mes.nome.toLowerCase())}</div><h2>O trabalho do mês</h2>
-    <ul class="done">${itens.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`);
+    ${blocos.map(([nome, it]) => `<div class="canal">${nome}</div><ul class="done">${it.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`).join('')}`);
+}
+
+function pgAval(D, n) {
+  if (!D.gbp || !avalBaixa(D)) return '';
+  const a = D.aval;
+  const h = a === 0 ? 'Seu perfil ainda não tem avaliações.' : `Seu perfil tem só ${int(a)} ${a === 1 ? 'avaliação' : 'avaliações'}.`;
+  return pagina(D, n, `<div class="tag">Avaliações no Google</div><h2>${h}</h2>
+    <div class="hero">${int(a)}<small>${a === 1 ? 'avaliação no total' : 'avaliações no total'}</small></div>
+    <p>Quem acha você no Google costuma olhar as estrelas e ler os comentários antes de ligar, mandar mensagem ou ir até aí.</p>
+    <p><b>O que isso quer dizer para você:</b> cada cliente satisfeito que deixa uma avaliação ajuda o próximo a confiar. O melhor momento para pedir é logo depois da entrega ou do serviço.</p>`);
 }
 
 function pgPassos(D, n, texto) {
@@ -559,9 +648,10 @@ function pgTabela(D, n) {
   if (D.gbp) {
     const g = D.gbp; sec('Perfil no Google');
     if (ok(g.imp)) row('Vezes que apareceu', NaN, g.imp);
+    if (ok(D.aval)) row('Avaliações (total)', NaN, D.aval);
     row('Contatos (total)', g.prev.acoes, g.acoes);
     row('WhatsApp', g.prev.wa, g.wa); row('Ligações', g.prev.ligar, g.ligar); row('Cliques no site', g.prev.site, g.site);
-    if (ok(g.rotas)) row('Pedidos de rota', NaN, g.rotas);
+    if (ok(g.rotas)) row(D.contarRotas ? 'Pedidos de rota' : 'Pedidos de rota (fora da contagem)', g.prev.rotas, g.rotas);
   }
   return pagina(D, n, `<div class="tag">Para quem gosta de detalhe</div><h2 style="font-size:15pt">Todos os números do mês</h2>
     <table><tr><th>Indicador</th><th>${ant}</th><th>${esc(D.mes.nome)}</th></tr>${L.join('')}</table>`, '— = dado não recebido');
@@ -569,7 +659,7 @@ function pgTabela(D, n) {
 
 function render(D, fizemos, passos) {
   const fab = [
-    () => pgCapa(D), n => pgPergunta(D, n), n => pgAds(D, n), n => pgGbp(D, n), n => pgCanais(D, n),
+    () => pgCapa(D), n => pgPergunta(D, n), n => pgAds(D, n), n => pgGbp(D, n), n => pgAval(D, n), n => pgCanais(D, n),
     n => pgBuscas(D, n), n => pgRetorno(D, n), n => pgFizemos(D, n, fizemos), n => pgPassos(D, n, passos), n => pgTabela(D, n)
   ];
   let n = 0;
@@ -582,9 +672,41 @@ function render(D, fizemos, passos) {
 const $ = id => document.getElementById(id);
 let modelo = null;
 
+// Logo: reduzida para no máximo 600 px (mantém a transparência) e guardada por cliente neste navegador.
+const chaveLogo = c => 'logo:' + String(c || '').trim().toLowerCase();
+function lerLogo(c) { try { return localStorage.getItem(chaveLogo(c)) || ''; } catch (e) { return ''; } }
+function guardarLogo(c, url) { try { url ? localStorage.setItem(chaveLogo(c), url) : localStorage.removeItem(chaveLogo(c)); } catch (e) {} }
+function mostrarLogo() {
+  const url = modelo && modelo.logo;
+  $('logoPrev').hidden = $('btnTirarLogo').hidden = !url;
+  if (url) $('logoPrev').src = url; else $('logoPrev').removeAttribute('src');
+}
+function reduzirImagem(arquivo) {
+  return new Promise((ok, erro) => {
+    const leitor = new FileReader();
+    leitor.onerror = () => erro(new Error('Não consegui ler a imagem.'));
+    leitor.onload = () => {
+      const img = new Image();
+      img.onerror = () => erro(new Error('Esse arquivo não parece uma imagem. Use PNG, SVG, WEBP ou JPG.'));
+      img.onload = () => {
+        const w = img.naturalWidth || 600, h = img.naturalHeight || 200;
+        const f = Math.min(1, 600 / Math.max(w, h));
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(w * f)); cv.height = Math.max(1, Math.round(h * f));
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        ok(cv.toDataURL('image/png'));
+      };
+      img.src = leitor.result;
+    };
+    leitor.readAsDataURL(arquivo);
+  });
+}
+
 function mostrarAlertas(D) {
   const extra = [];
-  if (!$('fizemos').value.trim()) extra.push(['warn', 'A página "O que fizemos no mês" está vazia e fica fora do relatório. Preencha abaixo.']);
+  if (!['fzGbp', 'fzAds', 'fzSite'].some(id => $(id).value.trim())) extra.push(['warn', 'A página "O que fizemos no mês" está vazia e fica fora do relatório. Cole o histórico do seu sistema nos campos abaixo.']);
+  if (D.gbp && D.gbp.acoes !== D.gbp.bruto.acoes) extra.push(['info', D.contarRotas ? `Pedidos de rota na contagem: o Perfil conta ${int(D.gbp.acoes)} contatos em vez de ${int(D.gbp.bruto.acoes)}. As estimativas usam ${int(D.gbp.acoes)}.` : `Pedidos de rota fora da contagem: o Perfil conta ${int(D.gbp.acoes)} contatos (ligações + WhatsApp + site) em vez de ${int(D.gbp.bruto.acoes)}. As estimativas usam ${int(D.gbp.acoes)}.`]);
+  if (avalBaixa(D)) extra.push(['warn', `Atenção: o perfil tem só ${int(D.aval)} ${D.aval === 1 ? 'avaliação' : 'avaliações'}. O relatório inclui a página de avaliações e o passo de pedir avaliações.`]);
   const todos = [...D.alertas, ...extra];
   $('alertas').innerHTML = todos.map(([t, m]) => `<div class="alert ${t === 'err' ? 'err' : t === 'info' ? 'ok' : ''}">${esc(m)}</div>`).join('');
 }
@@ -598,7 +720,10 @@ function ajustarZoom() {
 
 function atualizar() {
   if (!modelo) return;
-  $('preview').innerHTML = render(modelo, $('fizemos').value, $('passos').value);
+  const av = $('avaliacoes').value.trim();
+  modelo.aval = av === '' ? NaN : num(av);
+  aplicarRotas(modelo, $('rotas').checked);
+  $('preview').innerHTML = render(modelo, { gbp: $('fzGbp').value, ads: $('fzAds').value, site: $('fzSite').value }, $('passos').value);
   $('previewTitle').hidden = false;
   mostrarAlertas(modelo);
   ajustarZoom();
@@ -610,7 +735,11 @@ function gerar() {
     if (!Object.keys(P).length) throw new Error('Não reconheci nenhum campo. Cole a tabela com os campos __ASSIM__ ou um JSON.');
     modelo = montarModelo(P);
     if (!modelo.ads && !modelo.gbp) { mostrarAlertas(modelo); $('preview').innerHTML = ''; return; }
-    $('fizemos').value = modelo.fizemos || $('fizemos').value;
+    if (ok(modelo.aval)) $('avaliacoes').value = modelo.aval;
+    else if ($('avaliacoes').value.trim() !== '') modelo.aval = num($('avaliacoes').value);
+    aplicarRotas(modelo, $('rotas').checked);
+    modelo.logo = lerLogo(modelo.cliente);
+    mostrarLogo();
     $('passos').value = sugestoes(modelo);
     $('extras').hidden = false;
     document.title = `${modelo.cliente} · ${modelo.periodo}`;
@@ -652,10 +781,31 @@ const EXEMPLO = [
 ].map(([k, v]) => k + '\t' + v).join('\n');
 
 $('btnGerar').onclick = gerar;
-$('btnExemplo').onclick = () => { $('entrada').value = EXEMPLO; $('fizemos').value = ''; gerar(); };
+$('btnExemplo').onclick = () => { $('entrada').value = EXEMPLO; ['fzGbp', 'fzAds', 'fzSite', 'avaliacoes'].forEach(id => $(id).value = ''); gerar(); };
 $('btnAtualizar').onclick = atualizar;
 $('btnPdf').onclick = () => { atualizar(); window.print(); };
-$('fizemos').oninput = () => modelo && mostrarAlertas(modelo);
+['fzGbp', 'fzAds', 'fzSite'].forEach(id => $(id).oninput = () => modelo && mostrarAlertas(modelo));
+$('logoArq').onchange = async () => {
+  const arq = $('logoArq').files[0];
+  if (!arq || !modelo) return;
+  try {
+    modelo.logo = await reduzirImagem(arq);
+    guardarLogo(modelo.cliente, modelo.logo);
+    mostrarLogo(); atualizar();
+  } catch (e) {
+    $('alertas').insertAdjacentHTML('beforeend', `<div class="alert err">${esc(e.message)}</div>`);
+  }
+  $('logoArq').value = '';
+};
+$('btnTirarLogo').onclick = () => { if (!modelo) return; modelo.logo = ''; guardarLogo(modelo.cliente, ''); mostrarLogo(); atualizar(); };
+$('rotas').onchange = () => { if (!modelo) return; aplicarRotas(modelo, $('rotas').checked); $('passos').value = sugestoes(modelo); atualizar(); };
+$('avaliacoes').onchange = () => {
+  if (!modelo) return;
+  const av = $('avaliacoes').value.trim();
+  modelo.aval = av === '' ? NaN : num(av);
+  $('passos').value = sugestoes(modelo);
+  atualizar();
+};
 window.addEventListener('resize', ajustarZoom);
 window.addEventListener('beforeprint', () => document.querySelectorAll('.page').forEach(p => p.style.zoom = 1));
 window.addEventListener('afterprint', ajustarZoom);
