@@ -86,9 +86,17 @@
   .hero small { font-size: 13pt; font-weight: 600; color: var(--ink-2); letter-spacing: 0; display: block; margin-top: 2mm; }
   .foot { margin-top: auto; font-size: 8pt; color: var(--muted); display: flex; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 2.5mm; }
   .card { background: var(--soft); border-radius: 4mm; padding: 4mm; margin-top: 4mm; }
+  .visitas { display: flex; gap: 3mm; align-items: center; background: var(--soft); border-radius: 3mm; padding: 2mm 3.5mm; margin-top: 2mm; }
+  .visitas b { font-size: 18pt; font-weight: 800; letter-spacing: -.02em; }
+  .visitas span { font-size: 9.5pt; color: var(--ink-2); line-height: 1.3; }
+  .sub-l { font-size: 8pt; color: var(--muted); }
+  .visitas small { display: block; font-size: 8pt; color: var(--muted); }
+  .miudo { font-size: 8.5pt !important; color: var(--muted) !important; margin-top: 2mm !important; line-height: 1.35 !important; }
+  .nota-txt h3 { font-size: 19pt; line-height: 1.12; font-weight: 800; letter-spacing: -.015em; margin-top: 3mm; }
+  .nota-txt p { font-size: 11.5pt; }
   .note { background: var(--warn-bg); color: var(--warn-ink); border-radius: 3mm; padding: 3mm 3.5mm; font-size: 9pt; line-height: 1.4; margin-top: 4mm; }
   .q { font-size: 13pt; font-weight: 600; color: var(--ink-2); line-height: 1.35; margin-top: 5mm; }
-  .bars { margin-top: 4mm; display: flex; flex-direction: column; gap: 3mm; }
+  .bars { margin-top: 3.5mm; display: flex; flex-direction: column; gap: 2.5mm; }
   .bar .lbl { display: flex; justify-content: space-between; font-size: 9.5pt; color: var(--ink-2); margin-bottom: 1mm; gap: 2mm; }
   .bar .lbl b { color: var(--ink); font-size: 11pt; }
   .bar .lbl .was { color: var(--muted); }
@@ -124,7 +132,7 @@
   table { width: 100%; border-collapse: collapse; margin-top: 3mm; font-size: 8.6pt; }
   th { text-align: right; font-weight: 600; color: var(--muted); padding: 1.4mm 0; border-bottom: 1px solid var(--line); }
   th:first-child, td:first-child { text-align: left; }
-  td { text-align: right; padding: 1.5mm 0; border-bottom: 1px solid var(--line); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  td { text-align: right; padding: 1.15mm 0; border-bottom: 1px solid var(--line); color: var(--ink-2); font-variant-numeric: tabular-nums; }
   td:last-child { color: var(--ink); font-weight: 600; }
   tr.sec td { color: var(--accent); font-weight: 700; font-size: 7.5pt; letter-spacing: .06em; text-transform: uppercase; padding-top: 3mm; border-bottom: none; }
   .terms { margin-top: 4mm; display: flex; flex-direction: column; gap: 2.5mm; }
@@ -250,7 +258,7 @@ function lerEntrada(txt) {
     return out;
   }
   for (const linha of txt.split(/\r?\n/)) {
-    const m = linha.match(/^\s*(__[A-Z0-9_]+__)\s*(.*)$/);
+    const m = linha.match(/^\s*(__[A-Z0-9_]+__)\s*(?:=\s*)?(.*)$/); // aceita tabulação ou " = "
     if (m) out[m[1]] = m[2].trim();
   }
   return out;
@@ -315,9 +323,11 @@ function montarModelo(P) {
       ligDir: num(P.__ADS_LIGACOES_DIRETAS__), waDir: num(P.__ADS_WHATSAPP_DIRETO__),
       telPerf: num(P.__ADS_TELEFONE_PERFIL__), waPerf: num(P.__ADS_WHATSAPP_PERFIL__),
       outras: num(P.__ADS_OUTRAS_ACOES__), rotas: num(P.__ADS_PEDIDOS_ROTA__),
+      waSite: num(P.__ADS_WHATSAPP_SITE__), visitas: num(P.__ADS_VISITAS_LOJA__),
       prev: {
         acoes: ant('Ações dos anúncios'), ligDir: ant('Ligações diretas (anúncio)'), waDir: ant('WhatsApp direto (anúncio)'),
-        telPerf: ant('Telefone pelo perfil (anúncio)'), waPerf: ant('WhatsApp pelo perfil (anúncio)'), custo: custoAnt
+        telPerf: ant('Telefone pelo perfil (anúncio)'), waPerf: ant('WhatsApp pelo perfil (anúncio)'), custo: custoAnt,
+        waSite: ant('WhatsApp pelo site (anúncio)'), visitas: ant('Visitas à loja (anúncio)')
       },
       campanhas: tabela(P.__ADS_CAMPANHAS_TABELA__).slice(1),
       palavras: tabela(P.__ADS_TOP_PALAVRAS_TABELA__).slice(1)
@@ -349,8 +359,28 @@ function montarModelo(P) {
   D.hip = { pct: mp ? num(mp[1]) / 100 : NaN, ticket: mt ? num(mt[1]) : NaN };
 
   D.aval = num(P.__GBP_AVALIACOES__ ?? P.__GBP_TOTAL_AVALIACOES__);
+  D.aviso = String(P.__AVISO_MUDANCA__ || '').trim();
+  D.nota = limparNota(P.__NOTA_NUMEROS__);
+  // Nome de quem recebe: __CONTATO_NOME__; senão __PRIMEIRO_NOME__, desde que não seja o próprio responsável da agência.
+  const prim = String(P.__PRIMEIRO_NOME__ || '').trim(), resp1 = D.resp.split(/\s+/)[0] || '';
+  D.contato = String(P.__CONTATO_NOME__ || '').trim() || (prim && normTxt(prim) !== normTxt(resp1) ? prim : '');
   validar(D);
   return D;
+}
+
+const normTxt = s => String(s || '').trim().toLowerCase();
+// A nota vem como HTML curto da tabela. Ficam só título, parágrafos, negrito e listas, sem atributos.
+function limparNota(html) {
+  html = String(html || '').trim(); if (!html) return '';
+  const doc = new DOMParser().parseFromString('<div>' + html + '</div>', 'text/html');
+  const OK = { H3:'h3', H4:'h3', P:'p', B:'b', STRONG:'b', EM:'i', I:'i', BR:'br', UL:'ul', OL:'ol', LI:'li' };
+  const andar = n => [...n.childNodes].map(c => {
+    if (c.nodeType === 3) return esc(c.textContent);
+    if (c.nodeType !== 1) return '';
+    const t = OK[c.tagName]; if (!t) return andar(c);
+    return t === 'br' ? '<br>' : `<${t}>${andar(c)}</${t}>`;
+  }).join('');
+  return andar(doc.body.firstChild).trim();
 }
 
 /* ============================================================
@@ -381,7 +411,7 @@ function validar(D) {
   if (!ok(D.hip.pct) || !ok(D.hip.ticket)) A.push(['warn', 'Não achei a hipótese de fechamento (% e ticket médio). As páginas de retorno ficam de fora.']);
   if (D.ads) {
     const a = D.ads;
-    const soma = [a.ligDir, a.waDir, a.telPerf, a.waPerf, a.outras].filter(ok).reduce((x, y) => x + y, 0);
+    const soma = [a.ligDir, a.waDir, a.telPerf, a.waPerf, a.outras, a.waSite].filter(ok).reduce((x, y) => x + y, 0);
     if (soma && soma !== a.acoes) A.push(['err', `Ads: as partes somam ${soma}, mas o total é ${a.acoes}. Confira as conversões.`]);
     const somaCamp = a.campanhas.map(r => num(r[2])).filter(ok).reduce((x, y) => x + y, 0);
     if (somaCamp && somaCamp !== a.acoes) A.push(['err', `Ads: as campanhas somam ${somaCamp} contatos, mas o total é ${a.acoes}. Pode haver conversão contada duas vezes. A tabela de campanhas não vai para o relatório.`]);
@@ -393,6 +423,8 @@ function validar(D) {
     if (soma && soma !== g.acoes && somaR !== g.acoes) A.push(['warn', `GBP: ligar + WhatsApp + site somam ${soma} (${somaR} com rotas), mas o total é ${g.acoes}.`]);
   }
   if (D.ads && D.gbp) A.push(['info', 'Ads e GBP são mostrados separados, sem somar, porque a mesma pessoa pode aparecer nos dois.']);
+  if (D.ads && ok(D.ads.visitas) && D.ads.visitas > 0) A.push(['info', `Visitas à loja (${int(D.ads.visitas)}) aparecem num bloco separado e não entram nos contatos nem nas estimativas.`]);
+  if (D.resp && D.contato === '' && normTxt(D.P.__PRIMEIRO_NOME__) === normTxt(D.resp.split(/\s+/)[0])) A.push(['warn', '__PRIMEIRO_NOME__ é o responsável da agência. Para a saudação do WhatsApp, mande o nome do cliente em __CONTATO_NOME__.']);
 }
 
 /* ============================================================
@@ -434,9 +466,9 @@ function tendencia(ev) {
 
 function canais(D) {
   // WhatsApp x ligação, somando o que existir
-  const wa = [D.ads && D.ads.waDir, D.ads && D.ads.waPerf, D.gbp && D.gbp.wa].filter(ok).reduce((x, y) => x + y, 0);
+  const wa = [D.ads && D.ads.waDir, D.ads && D.ads.waPerf, D.ads && D.ads.waSite, D.gbp && D.gbp.wa].filter(ok).reduce((x, y) => x + y, 0);
   const lig = [D.ads && D.ads.ligDir, D.ads && D.ads.telPerf, D.gbp && D.gbp.ligar].filter(ok).reduce((x, y) => x + y, 0);
-  const waP = [D.ads && D.ads.prev.waDir, D.ads && D.ads.prev.waPerf, D.gbp && D.gbp.prev.wa].filter(ok).reduce((x, y) => x + y, 0);
+  const waP = [D.ads && D.ads.prev.waDir, D.ads && D.ads.prev.waPerf, D.ads && D.ads.prev.waSite, D.gbp && D.gbp.prev.wa].filter(ok).reduce((x, y) => x + y, 0);
   const ligP = [D.ads && D.ads.prev.ligDir, D.ads && D.ads.prev.telPerf, D.gbp && D.gbp.prev.ligar].filter(ok).reduce((x, y) => x + y, 0);
   return { wa, lig, total: wa + lig, share: wa + lig ? wa / (wa + lig) : NaN, shareP: waP + ligP ? waP / (waP + ligP) : NaN, totalP: waP + ligP, waP };
 }
@@ -584,6 +616,11 @@ function pgCapa(D) {
   return pagina(D, 1, corpo, D.resp ? 'Preparado por ' + esc(D.resp) : esc(D.cliente)).replace(`<span>1</span>`, `<span>${esc(D.data)}</span>`);
 }
 
+function pgNota(D, n) {
+  if (!D.nota) return '';
+  return pagina(D, n, `<div class="tag">Antes dos números</div><div class="nota-txt">${D.nota}</div>`);
+}
+
 function pgPergunta(D, n) {
   if (!ok(D.hip.ticket) || !ok(D.invest.cur) || !D.invest.cur) return '';
   const k = Math.max(1, Math.ceil(D.invest.cur / D.hip.ticket));
@@ -601,14 +638,16 @@ function pgPergunta(D, n) {
 function pgAds(D, n) {
   const a = D.ads; if (!a) return '';
   const temPrev = ok(a.prev.acoes);
+  const soma2 = (x, y) => ok(x) || ok(y) ? (ok(x) ? x : 0) + (ok(y) ? y : 0) : NaN;
+  const temSite = ok(a.waSite) && a.waSite > 0;
   const itens = [
-    ['WhatsApp direto', a.waDir, a.prev.waDir], ['Ligação direta', a.ligDir, a.prev.ligDir],
+    [temSite ? 'WhatsApp pelo anúncio' : 'WhatsApp direto', soma2(a.waDir, a.waSite), temSite ? soma2(a.prev.waDir, a.prev.waSite) : a.prev.waDir], ['Ligação direta', a.ligDir, a.prev.ligDir],
     ['Ligação pelo perfil do anúncio', a.telPerf, a.prev.telPerf], ['WhatsApp pelo perfil do anúncio', a.waPerf, a.prev.waPerf],
     ['Outras ações', a.outras, NaN]
   ].filter(i => ok(i[1]) && (i[1] > 0 || (ok(i[2]) && i[2] > 0)));
   const max = Math.max(...itens.flatMap(i => [i[1], ok(i[2]) ? i[2] : 0]), 1);
   const w = v => (v / max * 100).toFixed(1) + '%';
-  const barras = itens.map(([l, c, p]) => `<div class="bar"><div class="lbl"><span>${l}</span><span>${temPrev && ok(p) ? `<span class="was">${int(p)} →</span> ` : ''}<b>${int(c)}</b></span></div>
+  const barras = itens.map(([l, c, p]) => `<div class="bar"><div class="lbl"><span>${l}${temSite && l === 'WhatsApp pelo anúncio' ? ` <small class="sub-l">(${int(a.waSite)} pela página do site)</small>` : ''}</span><span>${temPrev && ok(p) ? `<span class="was">${int(p)} →</span> ` : ''}<b>${int(c)}</b></span></div>
     <div class="pair">${temPrev && ok(p) ? `<div class="track"><div class="fill prev" style="width:${w(p)}"></div></div>` : ''}<div class="track"><div class="fill" style="width:${w(c)}"></div></div></div></div>`).join('');
   const cpa = a.acoes ? a.custo / a.acoes : NaN;
   const cpaP = ok(a.prev.custo) && a.prev.acoes ? a.prev.custo / a.prev.acoes : NaN;
@@ -629,8 +668,10 @@ function pgAds(D, n) {
     insight = `<b>O que mais trouxe contato foi ${low(top[0])}</b> (${int(top[1])}).`;
   }
   const legenda = temPrev ? `<div class="legend"><span><i style="background:var(--prev)"></i>${esc(D.mesAnt)}</span><span><i style="background:var(--accent)"></i>${esc(D.mes.nome)}</span></div>` : '';
+  const aviso = D.aviso ? `<div class="note" style="margin-top:2.5mm"><b>Mudança no mês:</b> ${esc(D.aviso)}</div>` : '';
+  const visitas = ok(a.visitas) && a.visitas > 0 ? `<div class="visitas"><b>${int(a.visitas)}</b><span>visitas à loja${ok(a.prev.visitas) && D.mesAnt ? ` (${esc(D.mesAnt.toLowerCase())}: ${int(a.prev.visitas)})` : ''}<small>Estimativa do próprio Google, fora da conta de contatos.</small></span></div>` : '';
   return pagina(D, n, `<div class="tag">Anúncios no Google</div><h2>${int(a.acoes)} pessoas pediram para falar com você.</h2>
-    <p>${linha}</p><div class="bars">${barras}</div>${legenda}${insight ? `<p>${insight}</p>` : ''}`);
+    ${aviso}<p>${linha}</p><div class="bars">${barras}</div>${legenda}${insight ? `<p>${insight}</p>` : ''}${visitas}`);
 }
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 const low = s => /^WhatsApp/.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1);
@@ -750,8 +791,10 @@ function pgTabela(D, n) {
     row('Contatos (total)', a.prev.acoes, a.acoes);
     row('WhatsApp direto', a.prev.waDir, a.waDir); row('Ligação direta', a.prev.ligDir, a.ligDir);
     row('Ligação pelo perfil', a.prev.telPerf, a.telPerf); row('WhatsApp pelo perfil', a.prev.waPerf, a.waPerf);
+    if (ok(a.waSite)) row('WhatsApp pela página do site', a.prev.waSite, a.waSite);
     row('Custo por contato', ok(a.prev.custo) && a.prev.acoes ? a.prev.custo / a.prev.acoes : NaN, a.acoes ? a.custo / a.acoes : NaN, brl);
     if (ok(a.rotas)) row('Pedidos de rota', NaN, a.rotas);
+    if (ok(a.visitas)) row('Visitas à loja (estimativa, fora da contagem)', a.prev.visitas, a.visitas);
   }
   if (D.gbp) {
     const g = D.gbp; sec('Perfil no Google');
@@ -767,7 +810,7 @@ function pgTabela(D, n) {
 
 function render(D, fizemos, passos) {
   const fab = [
-    () => pgCapa(D), n => pgPergunta(D, n), n => pgAds(D, n), n => pgGbp(D, n), n => pgAval(D, n), n => pgCanais(D, n),
+    () => pgCapa(D), n => pgNota(D, n), n => pgPergunta(D, n), n => pgAds(D, n), n => pgGbp(D, n), n => pgAval(D, n), n => pgCanais(D, n),
     n => pgBuscas(D, n), n => pgRetorno(D, n), n => pgFizemos(D, n, fizemos), n => pgPassos(D, n, passos), n => pgTabela(D, n)
   ];
   let n = 0;
@@ -872,7 +915,8 @@ function gerar() {
     modelo.logo = lerLogo(modelo.cliente);
     mostrarLogo();
     $('passos').value = sugestoes(modelo);
-    $('contato').value = lerContato(modelo.cliente);
+    $('contato').value = modelo.contato || lerContato(modelo.cliente);
+    if (modelo.contato) guardarContato(modelo.cliente, modelo.contato);
     msgEditada = false;
     $('extras').hidden = $('menu').hidden = $('acoes').hidden = false;
     document.title = `${modelo.cliente} · ${modelo.periodo}`;

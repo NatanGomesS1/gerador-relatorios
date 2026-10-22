@@ -23,6 +23,15 @@ Página única que transforma a tabela de placeholders do app em relatório PDF 
 - Escreve a mensagem do WhatsApp com a mesma manchete da capa, o número com comparação e o passo mais importante (avaliações primeiro, se o perfil tiver poucas). Não leva estimativa em R$, porque fora do PDF ela pode ser lida como promessa.
 - Confere os dados e avisa só no painel, sem ir para o PDF: soma das campanhas diferente do total, partes que não fecham, falta de mês anterior ou de hipótese.
 
+**Campos opcionais da tabela** (aceita `__CAMPO__<tab>valor` ou `__CAMPO__ = valor`)
+- `__CONTATO_NOME__`: primeiro nome de quem recebe no cliente (ex.: Luiz), usado na saudação do WhatsApp. `__RESPONSAVEL__` é quem prepara (você) e vai no rodapé da capa. Sem `__CONTATO_NOME__`, o gerador usa `__PRIMEIRO_NOME__` só se ele for diferente do responsável.
+- `__ADS_WHATSAPP_SITE__`: WhatsApp de quem clicou no anúncio e passou pela página do site. Soma no WhatsApp do anúncio, com a nota "(N pela página do site)". Na tabela final aparece separado. No comparativo, use a linha "WhatsApp pelo site (anúncio)".
+- `__ADS_VISITAS_LOJA__`: visitas à loja estimadas pelo Google (loja física). Bloco separado na página de anúncios. **Não** entra nos contatos nem nas estimativas. No comparativo, use a linha "Visitas à loja (anúncio)".
+- `__AVISO_MUDANCA__`: uma frase sobre algo que mudou no mês (ex.: o anúncio passou a levar para a página). Aparece em destaque na página de anúncios.
+- `__NOTA_NUMEROS__`: texto curto em HTML (título `<h3>` e parágrafos `<p>`) que vira a página "Antes dos números", logo depois da capa. Outras marcações são removidas.
+- `__GBP_AVALIACOES__`: total de avaliações do Perfil.
+- Mês sem dado na evolução (ex.: Julho antes do acompanhamento): use `—`, e não `0`.
+
 **Privacidade:** os dados ficam no navegador e não são enviados para lugar nenhum.
 
 **Site (GA4/Search Console):** ainda não tem página. Quando o app gerar esses campos, a página é adicionada aqui.
