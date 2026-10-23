@@ -253,13 +253,13 @@ $('btnLimpar').onclick = () => { pontos.forEach(p => { p.pos = ''; p.visto = fal
 
 function texto() {
   const r = resumo(), linhas = [];
-  for (let i = 0; i < N; i++) linhas.push(pontos.slice(i * N, i * N + N).map(p => (valor(p.pos) ?? '—').toString().padStart(2, ' ')).join('  '));
+  for (let i = 0; i < N; i++) linhas.push(pontos.slice(i * N, i * N + N).map(p => { const v = valor(p.pos); return v === null ? '—' : v === 'x' ? 'x' : v + 'º'; }).join('\t'));
   return `Grade de Posições · ${new Date().toLocaleDateString('pt-BR')}
 Cliente: ${cfg.cliente || '-'}
 Busca: ${cfg.busca}
 Centro: ${cfg.c.lat}, ${cfg.c.lng} · Grade ${N}×${N} · ${cfg.km} km entre pontos
-Top 3: ${r.top3}/${r.total} pontos · Posição média: ${r.media ? r.media.toFixed(1) : '-'} · Não apareceu: ${r.naoAparece}
-(norte em cima)
+Top 3: ${r.top3}/${r.total} pontos · Posição média: ${r.media ? r.media.toFixed(1).replace('.', ',') + 'º' : '-'} · Não apareceu: ${r.naoAparece}
+(norte em cima · cada posição numa coluna)
 ${linhas.join('\n')}`;
 }
 
