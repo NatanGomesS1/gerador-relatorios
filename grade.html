@@ -66,6 +66,11 @@
   th { color: var(--muted); font-weight: 600; font-size: 12px; }
   td button { padding: 5px 9px; font-size: 12px; }
   .empty { font-size: 13px; color: var(--muted); }
+  .cell input.quem { max-width: 100%; font-size: 11px; font-weight: 600; padding: 4px 3px; text-align: center; }
+  .cell input.quem::placeholder { font-weight: 400; }
+  .cell.top input.quem, .cell.mid input.quem, .cell.low input.quem, .cell.none input.quem { background: rgba(255,255,255,.92); }
+  .conc td input { padding: 6px 7px; font-size: 13px; }
+  .conc td.n { font-weight: 800; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -82,6 +87,7 @@
       <li><b>Escolha a grade e a distância.</b> 3×3 = 9 buscas, para um retrato rápido. 5×5 = 25 buscas, para o retrato completo. Distância entre pontos: 1 a 2 km em cidade média, 3 a 5 km se o cliente atende a região toda.</li>
       <li><b>Clique em "Abrir" em cada quadrado.</b> No Maps, conte em que posição o cliente aparece na lista da esquerda, <b>sem contar</b> os marcados "Patrocinado". Role a lista até uns 20 resultados.</li>
       <li><b>Digite a posição no quadrado.</b> Se não achar até o 20º, digite <code>x</code>. A cor muda sozinha.</li>
+      <li><b>Onde o cliente não é 1º, anote quem é</b> no campo "1º: quem?" (também sem contar "Patrocinado"). Depois de digitar um nome uma vez, ele aparece como sugestão nos outros pontos. No quadro "Concorrentes", preencha categoria e avaliações só de quem ganha em 2 ou mais pontos.</li>
       <li><b>Salve a medição.</b> Ela fica guardada neste navegador. Depois de uma mudança no Perfil, espere de 2 a 3 semanas, meça de novo com <b>a mesma busca, o mesmo centro, a mesma grade e a mesma distância</b>, e compare.</li>
     </ol>
     <p class="hint">O Maps ordena pela área que aparece na tela, que é uma aproximação do que alguém vê buscando daquele ponto. Serve muito bem para comparar antes e depois, desde que a medição seja sempre feita do mesmo jeito.</p>
@@ -115,9 +121,11 @@
     </div>
     <div class="kpis" id="kpis"></div>
     <p class="leitura" id="leitura"></p>
+    <div id="concBox"></div>
     <div class="row">
       <button class="primary" id="btnSalvar">Salvar medição</button>
       <button id="btnCopiar">Copiar resumo</button>
+      <button id="btnApp">Copiar para o app</button>
       <button id="btnLimpar">Limpar posições</button>
     </div>
     <p class="hint" id="salvoMsg"></p>
@@ -130,10 +138,54 @@
   </section>
 </main>
 
+<datalist id="listaConc"></datalist>
 <script>
 const $ = id => document.getElementById(id);
-const KEY = 'grade-posicoes-v1';
-let N = 3, pontos = [], cfg = null;
+const KEY = 'grade-posicoes-v1', KEY_CONC = 'grade-concorrentes-v1';
+let N = 3, pontos = [], cfg = null, conc = {}, _sigConc = '';
+
+/* ---------- Concorrentes (quem é 1º onde o cliente não é) ---------- */
+const chave = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+function lerMemoria() { try { return JSON.parse(localStorage.getItem(KEY_CONC) || '{}'); } catch { return {}; } }
+function gravarMemoria() {
+  if (!cfg) return;
+  const mem = lerMemoria(), k = chave(cfg.cliente) || '-';
+  mem[k] = { ...(mem[k] || {}), ...conc };
+  try { localStorage.setItem(KEY_CONC, JSON.stringify(mem)); } catch {}
+}
+function carregarMemoria() { const mem = lerMemoria(); conc = { ...(mem[chave(cfg.cliente) || '-'] || {}) }; }
+const precisaQuem = p => { const v = valor(p.pos); return v !== null && v !== 1; };
+function placar() {
+  const cont = {};
+  pontos.forEach(p => { if (!precisaQuem(p)) return; const k = chave(p.primeiro); if (!k) return; cont[k] = (cont[k] || 0) + 1; });
+  return Object.entries(cont).map(([k, n]) => ({ k, n, nome: (conc[k] && conc[k].nome) || nomeOriginal(k), ...(conc[k] || {}) })).sort((a, b) => b.n - a.n || a.nome.localeCompare(b.nome));
+}
+function nomeOriginal(k) { const p = pontos.find(x => chave(x.primeiro) === k); return p ? p.primeiro.trim() : k; }
+function atualizarLista() {
+  const nomes = new Set(Object.values(conc).map(c => c.nome).filter(Boolean));
+  pontos.forEach(p => { if (p.primeiro && p.primeiro.trim()) nomes.add(p.primeiro.trim()); });
+  $('listaConc').innerHTML = [...nomes].map(n => `<option value="${esc(n)}">`).join('');
+}
+function desenharConc() {
+  const pl = placar(), sem = pontos.filter(p => precisaQuem(p) && !chave(p.primeiro)).length;
+  const alvo = pontos.filter(precisaQuem).length;
+  const sig = [alvo, sem, ...pl.map(c => c.k + ':' + c.n)].join('|');
+  if (sig === _sigConc) return;
+  _sigConc = sig;
+  if (!alvo) { $('concBox').innerHTML = ''; return; }
+  $('concBox').innerHTML = `<h2 style="margin-top:18px">Concorrentes</h2>
+    <p class="hint" style="margin-top:0">Quem é 1º nos ${alvo} ${alvo === 1 ? 'ponto' : 'pontos'} onde o cliente não é.${sem ? ` Falta anotar ${sem}.` : ''} Categoria e avaliações: basta preencher de quem ganha em 2 ou mais pontos.</p>
+    ${pl.length ? `<table class="conc"><tr><th>Concorrente</th><th>1º em</th><th>Categoria principal</th><th>Avaliações</th><th>Nota</th></tr>${pl.map(c => `
+      <tr><td>${esc(c.nome)}</td><td class="n">${c.n} ${c.n === 1 ? 'ponto' : 'pontos'}</td>
+      <td><input data-k="${esc(c.k)}" data-f="categoria" value="${esc(c.categoria || '')}" placeholder="${c.n >= 2 ? 'ex.: Loja de materiais elétricos' : 'opcional'}"></td>
+      <td><input data-k="${esc(c.k)}" data-f="avaliacoes" inputmode="numeric" value="${esc(c.avaliacoes ?? '')}" style="max-width:80px"></td>
+      <td><input data-k="${esc(c.k)}" data-f="nota" inputmode="decimal" value="${esc(c.nota ?? '')}" style="max-width:60px"></td></tr>`).join('')}</table>` : ''}`;
+  $('concBox').querySelectorAll('input').forEach(inp => inp.addEventListener('input', e => {
+    const k = e.target.dataset.k, f = e.target.dataset.f;
+    conc[k] = { ...(conc[k] || {}), nome: (conc[k] && conc[k].nome) || nomeOriginal(k), [f]: e.target.value.trim() };
+    gravarMemoria(); $('leitura').innerHTML = leitura(resumo());
+  }));
+}
 
 /* ---------- Leitura das coordenadas ---------- */
 function lerCentro(txt) {
@@ -185,6 +237,7 @@ function resumo() {
 
 /* ---------- Tela ---------- */
 function desenhar() {
+  _sigConc = '';
   const km = cfg.km, board = $('board');
   board.style.gridTemplateColumns = `repeat(${N}, minmax(0, 1fr))`;
   board.innerHTML = pontos.map((p, i) => {
@@ -193,13 +246,20 @@ function desenhar() {
       <span class="lbl">${rotulo(p, km)}</span>
       <a href="${link(p, cfg.busca, km)}" target="_blank" rel="noopener" data-i="${i}"${p.visto ? ' class="visto"' : ''}>Abrir</a>
       <input inputmode="numeric" maxlength="3" value="${p.pos}" data-i="${i}" aria-label="Posição no ponto ${rotulo(p, km)}" placeholder="—">
+      <input class="quem" list="listaConc" value="${esc(p.primeiro || '')}" data-q="${i}" aria-label="Quem é 1º no ponto ${rotulo(p, km)}" placeholder="1º: quem?"${precisaQuem(p) ? '' : ' hidden'}>
     </div>`;
   }).join('');
-  board.querySelectorAll('input').forEach(inp => inp.addEventListener('input', e => {
+  board.querySelectorAll('input:not(.quem)').forEach(inp => inp.addEventListener('input', e => {
     const i = +e.target.dataset.i; pontos[i].pos = e.target.value;
     const cell = $('c' + i); cell.className = `cell ${classe(valor(e.target.value))}${!pontos[i].dx && !pontos[i].dy ? ' center' : ''}`;
+    cell.querySelector('.quem').hidden = !precisaQuem(pontos[i]);
     atualizarResumo();
   }));
+  board.querySelectorAll('input.quem').forEach(inp => {
+    inp.addEventListener('input', e => { pontos[+e.target.dataset.q].primeiro = e.target.value; desenharConc(); $('leitura').innerHTML = leitura(resumo()); });
+    inp.addEventListener('change', atualizarLista);
+  });
+  atualizarLista();
   board.querySelectorAll('a').forEach(a => a.addEventListener('click', e => { pontos[+e.target.dataset.i].visto = true; e.target.classList.add('visto'); }));
   atualizarResumo();
 }
@@ -211,6 +271,7 @@ function atualizarResumo() {
     <div class="kpi"><div class="n">${r.media ? r.media.toFixed(1).replace('.', ',') + 'º' : '—'}</div><div class="t">posição média onde aparece</div></div>
     <div class="kpi"><div class="n">${r.feitos}/${r.total}</div><div class="t">pontos anotados</div></div>`;
   $('leitura').innerHTML = leitura(r);
+  desenharConc();
 }
 
 function leitura(r) {
@@ -225,7 +286,15 @@ function leitura(r) {
   else if (bordaTop >= borda.length / 2) t += 'Está forte inclusive nas bordas. <b>Vale aumentar a distância</b> na próxima medição para achar o limite.';
   else t += 'Está forte no centro e em parte das bordas.';
   if (r.naoAparece) t += ` Em ${r.naoAparece} ${r.naoAparece === 1 ? 'ponto ele não apareceu' : 'pontos ele não apareceu'} até o 20º.`;
-  return t;
+  return t + leituraConc();
+}
+function leituraConc() {
+  const pl = placar(), alvo = pontos.filter(precisaQuem).length, anot = pl.reduce((a, c) => a + c.n, 0);
+  if (!alvo || anot < alvo) return '';
+  const lider = pl[0], det = c => [c.categoria, c.avaliacoes ? c.avaliacoes + ' avaliações' : ''].filter(Boolean).join(', ');
+  if (alvo >= 3 && lider.n >= alvo / 2) return `<br><br><b>${esc(lider.nome)}</b> é 1º em ${lider.n} dos ${alvo} pontos onde o cliente não é${det(lider) ? ` (${esc(det(lider))})` : ''}: é o concorrente a estudar. Veja onde ele fica: se esses pontos estão perto dele, é distância; se estão espalhados, é relevância.`;
+  if (alvo >= 3 && lider.n <= 2) return `<br><br><b>Nenhum concorrente domina:</b> ${pl.length} perfis diferentes são 1º nos ${alvo} pontos. Cada um ganha perto de onde está, então a disputa é de distância e relevância do próprio perfil, não contra um rival específico.`;
+  return `<br><br>Quem mais aparece em 1º: ${pl.slice(0, 3).map(c => `<b>${esc(c.nome)}</b> (${c.n})`).join(', ')}.`;
 }
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -243,13 +312,14 @@ $('btnMontar').onclick = () => {
   $('msg').textContent = '';
   cfg = { cliente: $('cliente').value.trim(), busca, c, km: +$('dist').value, n: N };
   pontos = montarPontos(c, N, cfg.km);
+  carregarMemoria();
   $('cardGrade').hidden = false; $('salvoMsg').textContent = '';
   desenhar();
   $('guia').open = false;
   $('cardGrade').scrollIntoView({ behavior: 'smooth' });
 };
 
-$('btnLimpar').onclick = () => { pontos.forEach(p => { p.pos = ''; p.visto = false; }); desenhar(); };
+$('btnLimpar').onclick = () => { pontos.forEach(p => { p.pos = ''; p.primeiro = ''; p.visto = false; }); desenhar(); };
 
 function texto() {
   const r = resumo(), linhas = [];
@@ -260,8 +330,38 @@ Busca: ${cfg.busca}
 Centro: ${cfg.c.lat}, ${cfg.c.lng} · Grade ${N}×${N} · ${cfg.km} km entre pontos
 Top 3: ${r.top3}/${r.total} pontos · Posição média: ${r.media ? r.media.toFixed(1).replace('.', ',') + 'º' : '-'} · Não apareceu: ${r.naoAparece}
 (norte em cima · cada posição numa coluna)
-${linhas.join('\n')}`;
+${linhas.join('\n')}${textoConc()}`;
 }
+function textoConc() {
+  const pl = placar(); if (!pl.length) return '';
+  const quem = [];
+  for (let i = 0; i < N; i++) quem.push(pontos.slice(i * N, i * N + N).map(p => precisaQuem(p) ? (p.primeiro || '').trim() || '?' : (valor(p.pos) === 1 ? '(cliente)' : '—')).join('\t'));
+  return `
+
+Quem é 1º em cada ponto (norte em cima)
+${quem.join('\n')}
+
+Concorrente\t1º em\tCategoria\tAvaliações\tNota
+${pl.map(c => [c.nome, c.n + (c.n === 1 ? ' ponto' : ' pontos'), c.categoria || '', c.avaliacoes || '', c.nota || ''].join('\t')).join('\n')}`;
+}
+function blocoApp() {
+  const r = resumo(), pl = placar(), num = v => { const n = parseFloat(String(v ?? '').replace(',', '.')); return isFinite(n) ? n : null; };
+  return JSON.stringify({
+    tipo: 'ntn_grade', schemaVersion: 1, cliente: cfg.cliente || '', busca: cfg.busca, data: new Date().toISOString().slice(0, 10),
+    centro: cfg.c, n: N, km: cfg.km,
+    pontos: pontos.map((p, i) => { const v = valor(p.pos); return { lin: Math.floor(i / N), col: i % N, pos: v, primeiro: precisaQuem(p) && chave(p.primeiro) ? chave(p.primeiro) : null }; }),
+    concorrentes: pl.map(c => ({ id: c.k, nome: c.nome, categoria: c.categoria || null, avaliacoes: num(c.avaliacoes), nota: num(c.nota), pontos: c.n })),
+    resumo: { top3: r.top3, total: r.total, media: r.media ? +r.media.toFixed(1) : null, naoApareceu: r.naoAparece }
+  });
+}
+
+$('btnApp').onclick = async () => {
+  const r = resumo();
+  if (r.feitos < r.total) return $('salvoMsg').textContent = `Faltam ${r.total - r.feitos} pontos. Anote todos antes de mandar para o app.`;
+  if (!cfg.cliente) return $('salvoMsg').textContent = 'Preencha o nome do cliente igual ao cadastro do app e monte a grade de novo.';
+  try { await navigator.clipboard.writeText(blocoApp()); $('salvoMsg').textContent = 'Bloco copiado. No app, cole em Ranking Google → "Colar grade" (quando o botão existir).'; }
+  catch { $('salvoMsg').textContent = 'Não consegui copiar automaticamente neste navegador.'; }
+};
 
 $('btnCopiar').onclick = async () => {
   try { await navigator.clipboard.writeText(texto()); $('salvoMsg').textContent = 'Resumo copiado. Cole onde quiser (WhatsApp, planilha, relatório).'; }
@@ -275,7 +375,10 @@ $('btnSalvar').onclick = () => {
   const r = resumo();
   if (!r.feitos) return $('salvoMsg').textContent = 'Anote pelo menos um ponto antes de salvar.';
   const h = lerHist();
-  h.unshift({ data: new Date().toISOString(), cfg, pontos: pontos.map(p => ({ ...p, visto: false })), top3: r.top3, total: r.total, media: r.media });
+  gravarMemoria();
+  const pl = placar();
+  h.unshift({ data: new Date().toISOString(), cfg, pontos: pontos.map(p => ({ ...p, visto: false })), top3: r.top3, total: r.total, media: r.media,
+    concorrentes: pl.map(c => ({ nome: c.nome, pontos: c.n, categoria: c.categoria || '', avaliacoes: c.avaliacoes || '', nota: c.nota || '' })) });
   $('salvoMsg').textContent = gravarHist(h.slice(0, 60)) ? 'Medição salva neste navegador.' : 'Não deu para salvar neste navegador. Use "Copiar resumo".';
   mostrarHist();
 };
@@ -295,6 +398,7 @@ function mostrarHist() {
     $('cliente').value = cfg.cliente; $('busca').value = cfg.busca; $('centro').value = `${cfg.c.lat}, ${cfg.c.lng}`; $('dist').value = String(cfg.km);
     document.querySelectorAll('.seg button').forEach(x => x.classList.toggle('on', +x.dataset.n === N));
     pontos = b.dataset.repetir ? montarPontos(cfg.c, N, cfg.km) : m.pontos.map(p => ({ ...p }));
+    carregarMemoria();
     $('cardGrade').hidden = false; $('salvoMsg').textContent = b.dataset.repetir ? 'Mesma configuração da medição anterior. Anote as novas posições e salve.' : '';
     desenhar(); $('cardGrade').scrollIntoView({ behavior: 'smooth' });
   });
